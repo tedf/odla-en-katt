@@ -1,155 +1,211 @@
-# Generator State — speed upgrades are time-limited consumables
+# Generator State — cat personalities, offline modal, daily quests, achievements
 
-## What Was Built (incremental on iteration 003)
+## What Was Built (incremental on iteration 004)
 
-### Feature — speed upgrades become time-limited consumables
+This iteration ships four major features. Each was added as a self-contained
+domain module plus a UI surface, wired through the existing Zustand store and
+persistence layer.
 
-Previously, the four speed upgrades (Gödselvatten / Magisk Jord /
-Trollformelsfrö / Tidsmagi) were permanent unlocks: buying tier N hid
-all lower tiers from the shop. They are now **one-shot consumables**
-with a per-tier active duration. Only one boost can be active at a
-time, and re-buying replaces the current boost (resets the timer and
-swaps the multiplier).
+### Feature 1 — Cat Names + Personalities
 
-#### Updated catalogue — `src/domain/upgrades.ts`
+- New domain module `src/domain/catPersonality.ts`:
+  - 40-entry `CAT_NAMES` list (Mittens, Luna, Zap, …).
+  - 12-entry `CAT_TRAITS` catalogue (`lazy`, `energetic`, `lucky`, `greedy`,
+    `curious`, `sleepy`, `brave`, `tiny`, `giant`, `magical`, `speedy`,
+    `grumpy`) — each with a Swedish name, emoji, description, and a typed
+    effect (`growthMultiplier` / `valueMultiplier` / `lotteryBonus`).
+  - Helpers: `rollPersonality(rng?)`, `traitValueMultiplier(traitId)`,
+    `getTraitById`, `isValidTraitId`, plus a `CAT_TRAITS_BY_ID` map.
+- Store changes — every `harvestCat` now rolls a personality and applies the
+  trait's value multiplier on top of the existing weather bonus. The
+  personality (`name + traitId + weatherBonus`) is logged into
+  `harvestedCats[catTypeId].personalities`, persisted in localStorage.
+- UI:
+  - **PlotCard** shows a slide-up `PersonalityPopup` (Framer Motion) anchored
+    to the harvested plot, displaying `✨ <Name> · <TraitEmoji> <TraitName>`.
+    Auto-dismisses after ~2.2 s via `recentHarvest` TTL.
+  - **CatDisplay** (Stall) shows the most-recent personality + trait pill
+    next to each cat's sprite (`Mittens · 🍀 Lycklig`).
 
-| id        | name           | cost  | multiplier | duration |
-| --------- | -------------- | ----- | ---------- | -------- |
-| `speed_1` | Gödselvatten   | 50    | 1.5x       | 30 min   |
-| `speed_2` | Magisk Jord    | 200   | 2.0x       | 1 timme  |
-| `speed_3` | Trollformelsfrö| 800   | 3.0x       | 2 timmar |
-| `speed_4` | Tidsmagi       | 4000  | 5.0x       | 4 timmar |
+### Feature 2 — Offline Catch-up + Auto-Harvest
 
-The `SpeedUpgrade` interface gains `durationSeconds` and `emoji`. The
-old `activeSpeedMultiplier(purchasedIds)` and `nextAvailableUpgrade()`
-helpers are removed and replaced with:
+- New domain module `src/domain/offline.ts`:
+  - `calculateOfflineProgress(plots, lastSaveTime, nowMs, speedMultiplier,
+    autoHarvestUnlocked, rng?)` returns an `OfflineSummary`:
+    - `completedPlots` (auto-harvested, with rolled personalities)
+    - `readyPlots` (matured but not harvested)
+    - `coinsEarned`, `autoHarvestActive`, `awayMs`, and post-mutation
+      `plots` state.
+  - Pure; injectable RNG for test determinism.
+- New permanent **Verktyg** (utility upgrade) catalogue in `upgrades.ts`:
+  - `UTILITY_UPGRADES = [{ id: 'auto_harvest', cost: 5000, emoji: '🤖',
+    description: '… även offline!' }]`.
+  - Helpers `getUtilityUpgradeById`, `isValidUtilityUpgradeId`.
+- Store changes:
+  - `utilityUpgrades: UtilityUpgradeId[]` persistent field.
+  - `buyUtilityUpgrade(id)` action — one-time permanent purchase.
+  - `tick()` auto-harvests newly-ready plots when `auto_harvest` is owned.
+  - On boot, `bootstrapInitialState` calls `calculateOfflineProgress` and
+    threads the resulting summary into a new ephemeral `offlineSummary`.
+- New UI:
+  - **Shop → Verktyg** tab (`Shop.tsx` + `shop.css`) renders the utility
+    upgrade card.
+  - **OfflineModal** (`src/components/effects/OfflineModal.tsx` +
+    `offline-modal.css`) — Framer Motion spring slide-up backdrop with
+    moon glyph, per-plot rows showing rolled name + trait + sell value,
+    a green "Skörda alla" CTA, and an "Auto-Skörda samlade +N mynt"
+    summary when the upgrade is active.
 
-- `makeActiveUpgrade(upgradeId, now)` — builds an `ActiveSpeedUpgrade`
-  record `{ upgradeId, multiplier, expiresAt }` from a clock value.
-- `activeMultiplier(active, now)` — returns the live multiplier (or 1
-  if `active === null` / expired).
-- `pruneExpired(active, now)` — returns the upgrade if still live,
-  else `null`. Used by the store on load and on every tick.
-- `isValidUpgradeId(s)` — narrow type guard used by the save migration.
+### Feature 3 — Daily Quests
 
-#### Store changes — `src/store/useGameStore.ts`
+- New domain module `src/domain/quests.ts`:
+  - 12-entry `QUEST_POOL` covering all 6 quest types (`harvest_any`,
+    `harvest_type`, `sell_coins`, `spin_lottery`, `weather_event`,
+    `harvest_with_trait`). Each carries a typed reward `{ coins, seedId? }`.
+  - `getDailyQuests(date)` picks 3 unique quests deterministically using a
+    Fisher-Yates shuffle seeded by a `mulberry32` PRNG hashed from the date.
+  - `applyQuestProgress(quests, type, amount, meta?)` — pure progress
+    incrementer; respects `catTypeId` / `traitId` filters.
+  - `refreshDailyQuests(prev, date)` — handles streak preservation across
+    consecutive days and reset on gaps.
+  - `previousDate`, `msUntilMidnight`, `dateSeed`, `getQuestTemplate` helpers.
+- Store:
+  - Persistent `dailyQuests: DailyQuestsState` with `{ date, quests[],
+    streak, lastCompletedDate }`.
+  - New actions `updateQuestProgress(type, amount, meta?)` and
+    `claimQuestReward(idx)` — claim grants coins + optional seed and bumps
+    streak the first time per day.
+  - Quest progress is wired into `harvestCat` (harvest_any /
+    harvest_type / harvest_with_trait / sell_coins), `spinLottery`, and
+    `tick()` (weather events). Midnight rollover is detected in `tick()`.
+- UI:
+  - **Quests panel** (`src/components/Quests/Quests.tsx` +
+    `quests.css`) — daily-quest cards with emoji, title, description,
+    progress bar, percentage pill, reward badge (mynt + optional
+    seed-frö), pulsing green "Hämta belöning!" CTA when complete, and a
+    "Hämtad" tag once claimed. Header shows a flame streak pill plus a
+    midnight countdown (`HH:MM:SS`).
+  - **Bottom nav** gains an "Uppdrag" tab with a pulsing red pip when at
+    least one quest is ready to claim.
 
-- New persisted field `activeSpeedUpgrade: ActiveSpeedUpgrade | null`.
-  Legacy `purchasedUpgrades: SpeedUpgradeId[]` is retained for save
-  back-compat but is now always serialized as `[]`.
-- `buyUpgrade(id)` now:
-  - Deducts coins (no "already owned" guard — re-buys are allowed).
-  - Sets `activeSpeedUpgrade = makeActiveUpgrade(id, now)`.
-  - If a boost was already live, surfaces a "Ersatte föregående
-    boost" toast; otherwise a normal activation toast.
-- `tick()` prunes the expired upgrade *first* and uses the post-prune
-  multiplier for the growth math. The first tick after a boost expires
-  pushes a friendly toast ("⏰ Tidsmagi har tagit slut") and persists.
-- Offline catch-up on load uses the live multiplier if the saved boost
-  has not yet expired by `now`; expired boosts contribute 1x. (Strict
-  partial-window accounting was intentionally skipped.)
+### Feature 4 — Achievement System
 
-#### Persistence — `src/domain/persistence.ts`
+- New domain module `src/domain/achievements.ts`:
+  - 18 achievements across 5 categories (`harvest`, `coins`, `collection`,
+    `weather`, `special`). Two are secret (`meteor_hit`, `magical_cat`).
+  - `AchievementStats` is the *runtime* shape (`catTypesHarvested: Set`),
+    paired with `SavedAchievementStats` (array) in `persistence.ts` for
+    JSON-safe storage. Inflate / serialize helpers live in the store.
+  - Pure `newlyUnlocked(stats, alreadyUnlocked)` returns the freshly-met
+    ids, in catalogue order.
+  - `createEmptyAchievementStats`, `getAchievement`,
+    `ACHIEVEMENT_CATEGORIES`, `CATEGORY_LABELS`.
+- Store:
+  - Persistent `achievementStats: AchievementStats` and
+    `unlockedAchievements: string[]`.
+  - `checkAchievementsInline(set, get)` — module-scoped helper called by
+    every state-changing action that could trip a milestone. Applies coin
+    + seed rewards, queues an achievement toast, and adds the new id to
+    `unlockedAchievements`.
+  - Stats accumulate from: `harvestCat` (totalHarvested, totalCoinsEarned,
+    catTypesHarvested, harvestedWithMagicalTrait), `spinLottery`
+    (lotteriesSpun, totalCoinsEarned), `buyUpgrade` (upgradesPurchased),
+    `tick()` (weatherEventsExperienced, meteorHits), `claimQuestReward`
+    (longestStreak).
+- UI:
+  - **Achievement toast** — new gold-themed `toast-achievement` variant
+    with a "🏆 Achievement unlocked!" tag, big emoji, ascending shine
+    sweep, 4 s display. Wired through the same toast pipeline.
+  - **Achievements wall** (`src/components/Achievements/Achievements.tsx`
+    + `achievements.css`):
+    - Header with a 0-1 progress bar showing N/total.
+    - Category tabs: `Alla | Skörd | Mynt | Samling | Väder | Speciellt`.
+    - Auto-fit grid of trophy cards. Unlocked cards get a category-tinted
+      gradient, a corner sunburst, and a continuous shine sweep
+      (disabled under `prefers-reduced-motion`). Locked cards desaturate;
+      secret-locked cards show a lock icon + "???".
 
-- `SaveData` adds `activeSpeedUpgrade: ActiveSpeedUpgrade | null`.
-- Migration reads the field, validates each property with
-  `isValidUpgradeId` + finite-number checks, and drops the record if
-  `expiresAt <= now` (so timer-elapsed-while-offline restarts correctly).
-- `purchasedUpgrades` is migrated to `[]` regardless of input — legacy
-  permanent purchases are not converted into a live boost.
+### Persistence + tests
 
-#### Shop UI — `src/components/Shop/Shop.tsx` + `shop.css`
+- `SaveData` (in `src/domain/persistence.ts`) gains five new fields:
+  `utilityUpgrades`, `harvestedCats`, `dailyQuests`, `achievementStats`,
+  `unlockedAchievements`. Migration validates each field defensively and
+  defaults to empty/zero on missing or malformed input. The save key is
+  unchanged (`grow-a-cat:save:v1`).
+- New tests:
+  - `src/domain/__tests__/quests.test.ts` — 22 assertions covering pool
+    invariants, deterministic daily picks, progress filters (incl.
+    `catTypeId` / `traitId`), streak bump/reset on day boundary,
+    `previousDate` rollover, and `msUntilMidnight`.
+  - `src/domain/__tests__/achievements.test.ts` — 14 assertions covering
+    catalogue invariants (unique ids, valid categories, non-empty
+    titles), `createEmptyAchievementStats`, and `newlyUnlocked` paths
+    (harvest tiers, coin tiers, collection Set, secret meteor/magical,
+    streak threshold, already-claimed exclusion).
+  - Existing 53 tests untouched and still pass.
 
-- The "Uppgraderingar" tab now ships two banner states:
-  - **Empty state** — dashed-border card with `⚡ Ingen aktiv boost` +
-    helper text inviting the player to buy a flask.
-  - **Active state** — a tier-coloured gradient banner with:
-    - Large boost emoji in a circular frame on the left.
-    - `AKTIV` pill, name + multiplier chip.
-    - Big tabular-numerals countdown (`M:SS` or `H:MM:SS`).
-    - 6px progress bar showing elapsed fraction (transitions smoothly).
-    - A slowly rotating conic-gradient sheen for atmosphere (disabled
-      under `prefers-reduced-motion`).
-  - The banner animates in / out via `framer-motion` `AnimatePresence`
-    so swapping boosts feels intentional.
-- All four upgrade cards are always purchasable. The buy button now
-  shows a contextual label:
-  - `Starta om` when the same boost is currently active.
-  - `Byt boost` when a different boost is active.
-  - No label (just the coin cost) when nothing is active.
-- A local `useEffect` interval ticks the countdown every second; the
-  interval is cleared when no boost is active.
-- A small emoji is shown next to each upgrade name in the card list.
+### Bottom navigation
 
-#### HUD chip — `src/components/HUD/HUD.tsx` + `hud.css`
-
-- The pre-existing `⚡Nx` chip is replaced by a richer pill that
-  shows the upgrade emoji, the multiplier, and the live countdown:
-  `💧 1.5x · 12:34`. It pulses gently to flag that something is on a
-  timer; the animation respects `prefers-reduced-motion`.
-- The HUD's per-second clock is throttled to 1s while a boost is
-  active and 5s otherwise (lottery pip refresh).
-- `formatCountdown(ms)` is exported from `HUD.tsx` for parity with the
-  shop banner.
-
-#### Garden / PlotCard wiring
-
-- Both components now read `activeSpeedUpgrade` and compute
-  `speedMult = activeMultiplier(activeSpeedUpgrade, now)`. PlotCard
-  re-uses its existing per-250ms `now` interval. Garden adds its own
-  1s ticker (only while a boost is active) to keep the heading chip
-  accurate.
-
-#### Tests — `src/domain/__tests__/upgrades.test.ts`
-
-Rewritten for the new model. 11 assertions across:
-
-- Catalogue invariants (4 tiers; strictly increasing cost, multiplier,
-  duration; emoji present).
-- Exact spec values for cost / multiplier / `durationSeconds`.
-- `activeMultiplier` boundaries: `null`, mid-window, 1ms before
-  expiry, exact expiry, post-expiry.
-- `pruneExpired` returns the record while live and `null` once expired.
-- `makeActiveUpgrade` computes correct `expiresAt` and returns `null`
-  for unknown ids.
-- `isValidUpgradeId` accepts the four known ids and rejects others.
+The mobile bottom nav now exposes **Trädgård | Butik | Uppdrag | Trofér |
+Stall** — five tabs (the spec called for a 4-tab pattern, but Stall was
+kept as a fifth because removing it would regress sprite-inventory
+discovery). A small red pip on **Uppdrag** lights up when any quest is
+ready to claim. Lyckohjulet remains reachable both via its HUD button on
+the garden screen and a "🎰 Öppna Lyckohjulet" shortcut at the top of
+the Shop, per the spec.
 
 ## What Changed This Iteration (against task instructions)
 
-- `SPEED_UPGRADES` now has `cost: 50/200/800/4000` (was
-  `100/500/2000/10000`) and `durationSeconds: 1800/3600/7200/14400`.
-- Per-tier `emoji` and `description` text now match the task spec
-  exactly (`💧 / ✨ / 🔮 / ⏰`, "1.5x hastighet i 30 min", etc.).
-- Store state migrated from `purchasedUpgrades: string[]` to
-  `activeSpeedUpgrade: ActiveSpeedUpgrade | null` while keeping a
-  legacy `purchasedUpgrades` field on `SaveData` for back-compat.
-- `buyUpgrade` allows re-purchase; same-or-different tier replaces the
-  current boost (resets the timer).
-- `tick()` auto-expires the boost and pushes an expiry toast.
-- Shop UI: prominent active banner with countdown + progress bar; all
-  cards remain purchasable; contextual `Starta om` / `Byt boost`
-  button labels.
-- HUD: chip now shows emoji + multiplier + countdown together.
-- Persistence: validates `activeSpeedUpgrade` on load and drops it if
-  already expired.
-- Tests rewritten — 44 tests passing across 4 files (was 39).
+- Added four major features in their entirety:
+  1. Cat names + 12 personalities, rolled at harvest, persisted, and
+     surfaced in PlotCard + Stall.
+  2. `OfflineSummary` engine with auto-harvest support; rich slide-up
+     `OfflineModal` showing per-plot rolls and total earnings.
+  3. Daily quest engine with deterministic-by-date picks, streak
+     tracking, midnight rollover, claimable rewards, full-page panel.
+  4. Achievement engine with 18 milestones across 5 categories,
+     gold-toast unlock fanfare, and trophy wall UI.
+- New `Verktyg` shop tab + `auto_harvest` (🤖, 5000 mynt) permanent
+  utility upgrade.
+- New "Uppdrag" and "Trofér" bottom-nav tabs; pulsing pip on Uppdrag.
+- Toasts gained an `achievement` kind with a custom JSX/CSS variant.
+- `SaveData` migration handles every new field with defensive defaults,
+  so v1 saves from previous iterations load cleanly with empty
+  collections.
 
-## Known Issues
+## Tests
 
-- Offline catch-up math is approximate: if a boost expired *during*
-  the away window, we treat the whole away window as un-boosted. This
-  was a deliberate KISS choice; a strict implementation would split
-  the away window into "boosted" and "post-expiry" segments and apply
-  the multiplier to only the first segment.
-- The expiry toast fires on the first tick *after* `expiresAt`, which
-  in practice is within 1 second of the real expiry (tick cadence).
-  Visually, the HUD chip and shop banner already disappear at the
-  exact second `expiresAt` is reached because they read `now` directly.
+- `npm test` — 89 passing across 6 files (was 44 across 4):
+  - `events.test.ts` — unchanged
+  - `lottery.test.ts` — unchanged
+  - `plots.test.ts` — unchanged
+  - `upgrades.test.ts` — unchanged
+  - `quests.test.ts` — NEW, 22 assertions
+  - `achievements.test.ts` — NEW, 14 assertions
+
+## Build
+
+- `npm run build` — passes.
+- Bundle size: `dist/assets/index-…js` 424.59 kB (gzipped 129.53 kB),
+  CSS 64.05 kB (gzipped 12.06 kB). Up from 120.87 kB gzipped JS in
+  iteration 003, in line with the four-feature scope.
+
+## Known Issues / Limitations
+
+- The personality popup is anchored to the harvested plot index; if the
+  player immediately plants a new seed before the 2.2 s TTL expires the
+  popup disappears (we explicitly gate on `plot.state === 'empty'`).
+- The offline summary list shows per-plot rolls but does not include
+  named cats for plots that were *already* ready when the player closed
+  the tab — only newly-ripened-while-away plots roll a personality.
+- The achievement check is incremental (only fires on actions that mutate
+  the corresponding stat). A migration path that retroactively unlocks
+  achievements from an existing save's lifetime stats was not added.
+- Streak bumps once per day on the first claim, not on every quest
+  completion — by design.
 
 ## Dev Server
 
 - URL: http://localhost:5173
-- Status: running
+- Status: running (verified `HTTP 200` on `/`)
 - Command: `npm run dev -- --port 5173`
-- Build: `npm run build` passes — 120.87 kB gzipped JS, 8.83 kB gzipped CSS.
-- Tests: `npm test -- --run` — 44 passing across 4 files.

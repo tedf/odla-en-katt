@@ -4,6 +4,7 @@
  */
 
 import { CAT_TYPE_ORDER, CAT_TYPES } from '../../domain/catTypes';
+import { CAT_TRAITS_BY_ID } from '../../domain/catPersonality';
 import { useGameStore } from '../../store/useGameStore';
 import { CatSprite } from './CatSprite';
 import './cat-display.css';
@@ -12,6 +13,7 @@ export function CatDisplay() {
   const seedInventory = useGameStore((s) => s.seedInventory);
   const catsSold = useGameStore((s) => s.catsSoldByType);
   const unlockedTypes = useGameStore((s) => s.unlockedCatTypes);
+  const harvestedCats = useGameStore((s) => s.harvestedCats);
 
   const totalGrown = Object.values(catsSold).reduce((a, b) => a + b, 0);
   const collectionCount = CAT_TYPE_ORDER.filter(
@@ -43,6 +45,12 @@ export function CatDisplay() {
           const seedCount = seedInventory[id] ?? 0;
           const unlocked = unlockedTypes.includes(id);
           const showSilhouette = !unlocked && sold === 0;
+          const record = harvestedCats[id];
+          const mostRecent =
+            record && record.personalities.length > 0
+              ? record.personalities[record.personalities.length - 1]
+              : undefined;
+          const trait = mostRecent ? CAT_TRAITS_BY_ID[mostRecent.traitId] : null;
 
           return (
             <li
@@ -66,9 +74,26 @@ export function CatDisplay() {
                 <span className="cat-row-name">
                   {showSilhouette ? '???' : cat.name}
                 </span>
-                <span className="cat-row-rarity">
-                  {showSilhouette ? 'Olåst snart...' : rarityLabel(cat.rarity)}
-                </span>
+                {mostRecent && trait ? (
+                  <span className="cat-row-personality">
+                    <span className="cat-row-personality-name">
+                      {mostRecent.name}
+                    </span>
+                    <span
+                      className="cat-row-trait-pill"
+                      title={trait.description}
+                    >
+                      <span aria-hidden="true">{trait.emoji}</span>
+                      {trait.name}
+                    </span>
+                  </span>
+                ) : (
+                  <span className="cat-row-rarity">
+                    {showSilhouette
+                      ? 'Olåst snart...'
+                      : rarityLabel(cat.rarity)}
+                  </span>
+                )}
               </div>
               <div className="cat-row-badges">
                 {cat.infinite && (

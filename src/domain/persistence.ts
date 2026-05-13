@@ -12,11 +12,47 @@ import type { CatTypeId } from './catTypes';
 import { CAT_TYPE_ORDER } from './catTypes';
 import type { PlotState } from './plots';
 import { createDefaultPlots, MAX_PLOTS } from './plots';
-import type { ActiveSpeedUpgrade, SpeedUpgradeId } from './upgrades';
-import { isValidUpgradeId } from './upgrades';
+import type {
+  ActiveSpeedUpgrade,
+  SpeedUpgradeId,
+  UtilityUpgradeId,
+} from './upgrades';
+import { isValidUpgradeId, isValidUtilityUpgradeId } from './upgrades';
+import type { DailyQuestsState, QuestProgressEntry } from './quests';
+import type { CatTraitId } from './catPersonality';
+import { isValidTraitId } from './catPersonality';
+import { ACHIEVEMENTS_BY_ID } from './achievements';
 
 export const SAVE_KEY = 'grow-a-cat:save:v1';
 export const CURRENT_SAVE_VERSION = 1;
+
+/**
+ * A single named/personality-bearing cat stored in the player's collection
+ * after harvest. Multiple per type is normal.
+ */
+export interface HarvestedCatRecord {
+  catTypeId: CatTypeId;
+  count: number;
+  personalities: Array<{
+    name: string;
+    traitId: CatTraitId;
+    /** Sell multiplier from weather applied at harvest time (0 = baseline). */
+    weatherBonus: number;
+  }>;
+}
+
+/** Persisted shape for achievement stats (Set is serialized as array). */
+export interface SavedAchievementStats {
+  totalHarvested: number;
+  totalCoinsEarned: number;
+  catTypesHarvested: CatTypeId[];
+  weatherEventsExperienced: number;
+  lotteriesSpun: number;
+  upgradesPurchased: number;
+  longestStreak: number;
+  meteorHits: number;
+  harvestedWithMagicalTrait: number;
+}
 
 export interface SaveData {
   version: 1;
@@ -50,6 +86,16 @@ export interface SaveData {
   purchasedUpgrades: SpeedUpgradeId[];
   /** Currently-active time-limited speed boost, if any. */
   activeSpeedUpgrade: ActiveSpeedUpgrade | null;
+  /** Permanently-owned utility upgrades (e.g. `auto_harvest`). */
+  utilityUpgrades: UtilityUpgradeId[];
+  /** Per-cat-type harvested records (name + trait roll log). */
+  harvestedCats: Partial<Record<CatTypeId, HarvestedCatRecord>>;
+  /** Daily quests state (date-scoped). */
+  dailyQuests: DailyQuestsState | null;
+  /** Achievement lifetime stats (Set serialized as array). */
+  achievementStats: SavedAchievementStats;
+  /** Unlocked achievement ids (order = unlock order, ascending time). */
+  unlockedAchievements: string[];
   lastTickAt: number;
 }
 
@@ -71,6 +117,20 @@ function emptyCatsSold(): Record<CatTypeId, number> {
     },
     {} as Record<CatTypeId, number>,
   );
+}
+
+export function createEmptySavedAchievementStats(): SavedAchievementStats {
+  return {
+    totalHarvested: 0,
+    totalCoinsEarned: 0,
+    catTypesHarvested: [],
+    weatherEventsExperienced: 0,
+    lotteriesSpun: 0,
+    upgradesPurchased: 0,
+    longestStreak: 0,
+    meteorHits: 0,
+    harvestedWithMagicalTrait: 0,
+  };
 }
 
 export function createInitialSave(now: number): SaveData {
@@ -98,6 +158,11 @@ export function createInitialSave(now: number): SaveData {
     },
     purchasedUpgrades: [],
     activeSpeedUpgrade: null,
+    utilityUpgrades: [],
+    harvestedCats: {},
+    dailyQuests: null,
+    achievementStats: createEmptySavedAchievementStats(),
+    unlockedAchievements: [],
     lastTickAt: now,
   };
 }
@@ -247,6 +312,136 @@ function migrate(raw: unknown, now: number): SaveData {
     }
   }
 
+  // ---- New fields (cat personalities, utility upgrades, quests, achievements) ----
+  const utilityUpgrades: UtilityUpgradeId[] = Array.isArray(r.utilityUpgrades)
+    ? (r.utilityUpgrades.filter(
+        (id) => typeof id === 'string' && isValidUtilityUpgradeId(id),
+      ) as UtilityUpgradeId[])
+    : [];
+
+  const harvestedCats: Partial<Record<CatTypeId, HarvestedCatRecord>> = {};
+  if (r.harvestedCats && typeof r.harvestedCats === 'object') {
+    for (const [k, rawV] of Object.entries(
+      r.harvestedCats as Record<string, unknown>,
+    )) {
+      if (!CAT_TYPE_ORDER.includes(k as CatTypeId)) continue;
+      const v = rawV as Partial<HarvestedCatRecord> | undefined;
+      if (!v || typeof v !== 'object') continue;
+      const count = typeof v.count === 'number' ? v.count : 0;
+      const persRaw: unknown[] = Array.isArray(v.personalities)
+        ? (v.personalities as unknown[])
+        : [];
+      const personalities = persRaw
+        .filter((p): p is { name: string; traitId: string; weatherBonus?: number } => {
+          if (!p || typeof p !== 'object') return false;
+          const x = p as Record<string, unknown>;
+          return (
+            typeof x.name === 'string' &&
+            typeof x.traitId === 'string' &&
+            isValidTraitId(x.traitId)
+          );
+        })
+        .map((p) => ({
+          name: p.name,
+          traitId: p.traitId as CatTraitId,
+          weatherBonus:
+            typeof p.weatherBonus === 'number' && Number.isFinite(p.weatherBonus)
+              ? p.weatherBonus
+              : 0,
+        }));
+      harvestedCats[k as CatTypeId] = {
+        catTypeId: k as CatTypeId,
+        count,
+        personalities,
+      };
+    }
+  }
+
+  const dailyQuestsRaw = r.dailyQuests as DailyQuestsState | null | undefined;
+  let dailyQuests: DailyQuestsState | null = null;
+  if (dailyQuestsRaw && typeof dailyQuestsRaw === 'object') {
+    const dq = dailyQuestsRaw as Partial<DailyQuestsState>;
+    if (
+      typeof dq.date === 'string' &&
+      Array.isArray(dq.quests) &&
+      typeof dq.streak === 'number'
+    ) {
+      const quests: QuestProgressEntry[] = (dq.quests as QuestProgressEntry[])
+        .filter(
+          (q): q is QuestProgressEntry =>
+            !!q &&
+            typeof q === 'object' &&
+            typeof q.templateId === 'string' &&
+            typeof q.progress === 'number' &&
+            typeof q.completed === 'boolean' &&
+            typeof q.rewardClaimed === 'boolean',
+        )
+        .map((q) => ({
+          templateId: q.templateId,
+          progress: q.progress,
+          completed: q.completed,
+          rewardClaimed: q.rewardClaimed,
+        }));
+      dailyQuests = {
+        date: dq.date,
+        quests,
+        streak: dq.streak,
+        lastCompletedDate:
+          typeof dq.lastCompletedDate === 'string'
+            ? dq.lastCompletedDate
+            : null,
+      };
+    }
+  }
+
+  const statsRaw = r.achievementStats as
+    | Partial<SavedAchievementStats>
+    | undefined;
+  const achievementStats: SavedAchievementStats = {
+    totalHarvested:
+      typeof statsRaw?.totalHarvested === 'number'
+        ? statsRaw.totalHarvested
+        : 0,
+    totalCoinsEarned:
+      typeof statsRaw?.totalCoinsEarned === 'number'
+        ? statsRaw.totalCoinsEarned
+        : 0,
+    catTypesHarvested: Array.isArray(statsRaw?.catTypesHarvested)
+      ? (statsRaw.catTypesHarvested.filter(
+          (id) =>
+            typeof id === 'string' && CAT_TYPE_ORDER.includes(id as CatTypeId),
+        ) as CatTypeId[])
+      : [],
+    weatherEventsExperienced:
+      typeof statsRaw?.weatherEventsExperienced === 'number'
+        ? statsRaw.weatherEventsExperienced
+        : 0,
+    lotteriesSpun:
+      typeof statsRaw?.lotteriesSpun === 'number'
+        ? statsRaw.lotteriesSpun
+        : 0,
+    upgradesPurchased:
+      typeof statsRaw?.upgradesPurchased === 'number'
+        ? statsRaw.upgradesPurchased
+        : 0,
+    longestStreak:
+      typeof statsRaw?.longestStreak === 'number'
+        ? statsRaw.longestStreak
+        : 0,
+    meteorHits:
+      typeof statsRaw?.meteorHits === 'number' ? statsRaw.meteorHits : 0,
+    harvestedWithMagicalTrait:
+      typeof statsRaw?.harvestedWithMagicalTrait === 'number'
+        ? statsRaw.harvestedWithMagicalTrait
+        : 0,
+  };
+
+  const unlockedAchievements: string[] = Array.isArray(r.unlockedAchievements)
+    ? (r.unlockedAchievements.filter(
+        (id) => typeof id === 'string' && id in ACHIEVEMENTS_BY_ID,
+      ) as string[])
+    : [];
+
   return {
     version: CURRENT_SAVE_VERSION,
     coins: typeof r.coins === 'number' ? r.coins : base.coins,
@@ -286,6 +481,11 @@ function migrate(raw: unknown, now: number): SaveData {
     },
     purchasedUpgrades: [],
     activeSpeedUpgrade,
+    utilityUpgrades,
+    harvestedCats,
+    dailyQuests,
+    achievementStats,
+    unlockedAchievements,
     lastTickAt: typeof r.lastTickAt === 'number' ? r.lastTickAt : now,
   };
 }

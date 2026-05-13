@@ -697,6 +697,67 @@
   }
 }
 
+/* ---- Personality popup (harvest moment) ---- */
+.personality-popup {
+  position: absolute;
+  top: -36px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 6;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px 8px;
+  border-radius: var(--radius-pill);
+  background: linear-gradient(135deg, #ffffff 0%, #fff0d6 100%);
+  border: 2px solid #ffb870;
+  box-shadow:
+    0 6px 0 rgba(255, 184, 112, 0.4),
+    0 18px 32px -10px rgba(217, 152, 41, 0.55);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.78rem;
+  color: #5b2e02;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.personality-popup-sparkle {
+  font-size: 0.85rem;
+  animation: sparkle-spin 1.6s linear infinite;
+}
+
+@keyframes sparkle-spin {
+  0% {
+    transform: rotate(0);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.personality-popup-name {
+  font-size: 0.92rem;
+  letter-spacing: -0.01em;
+}
+
+.personality-popup-trait {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  background: rgba(167, 139, 250, 0.18);
+  color: #5b3aaa;
+  font-size: 0.74rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .personality-popup-sparkle {
+    animation: none;
+  }
+}
+
 /* ---- Plant sheet (modal) ---- */
 .plant-sheet-backdrop {
   position: fixed;

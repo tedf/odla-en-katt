@@ -20,6 +20,7 @@ import {
   getWeatherEvent,
   type WeatherEventId,
 } from '../../domain/events';
+import { CAT_TRAITS_BY_ID } from '../../domain/catPersonality';
 import { useGameStore } from '../../store/useGameStore';
 import { useSoundEffects } from '../../hooks/useSoundEffects';
 import { CatSprite } from '../CatDisplay/CatSprite';
@@ -37,10 +38,19 @@ export function PlotCard({ plot }: PlotCardProps) {
   const harvestCat = useGameStore((s) => s.harvestCat);
   const totalEarned = useGameStore((s) => s.totalEarned);
   const activeSpeedUpgrade = useGameStore((s) => s.activeSpeedUpgrade);
+  const recentHarvest = useGameStore((s) => s.recentHarvest);
   const speedMult = activeMultiplier(activeSpeedUpgrade, now);
   const { playPlant, playHarvest } = useSoundEffects();
   const myStrike =
     activeStrike && activeStrike.plotIndex === plot.index ? activeStrike : null;
+
+  // Personality popup is anchored to the plot that was just harvested,
+  // and only while the plot is still empty (we don't want it lingering
+  // after the player plants a fresh seed).
+  const showPersonalityPopup =
+    !!recentHarvest &&
+    recentHarvest.plotIndex === plot.index &&
+    plot.state === 'empty';
 
   useEffect(() => {
     if (plot.state !== 'growing') return;
@@ -174,6 +184,12 @@ export function PlotCard({ plot }: PlotCardProps) {
       )}
 
       <AnimatePresence>
+        {showPersonalityPopup && recentHarvest && (
+          <PersonalityPopup key={recentHarvest.key} harvest={recentHarvest} />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
         {showSheet && (
           <PlantSheet
             onClose={() => setShowSheet(false)}
@@ -188,6 +204,37 @@ export function PlotCard({ plot }: PlotCardProps) {
         )}
       </AnimatePresence>
     </>
+  );
+}
+
+interface PersonalityPopupProps {
+  harvest: {
+    catTypeId: CatTypeId;
+    name: string;
+    traitId: keyof typeof CAT_TRAITS_BY_ID;
+  };
+}
+
+function PersonalityPopup({ harvest }: PersonalityPopupProps) {
+  const trait = CAT_TRAITS_BY_ID[harvest.traitId];
+  return (
+    <motion.div
+      className="personality-popup"
+      role="status"
+      initial={{ opacity: 0, y: 12, scale: 0.85 }}
+      animate={{ opacity: 1, y: -6, scale: 1 }}
+      exit={{ opacity: 0, y: -22, scale: 0.92 }}
+      transition={{ type: 'spring', stiffness: 320, damping: 22 }}
+    >
+      <span className="personality-popup-sparkle" aria-hidden="true">
+        ✨
+      </span>
+      <span className="personality-popup-name">{harvest.name}</span>
+      <span className="personality-popup-trait">
+        <span aria-hidden="true">{trait.emoji}</span>
+        <span>{trait.name}</span>
+      </span>
+    </motion.div>
   );
 }
 

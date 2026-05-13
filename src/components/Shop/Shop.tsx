@@ -10,27 +10,36 @@ import { visibleSeeds } from '../../domain/economy';
 import { formatCoins, formatRemaining } from '../../domain/time';
 import {
   SPEED_UPGRADES,
+  UTILITY_UPGRADES,
   activeMultiplier,
   getUpgradeById,
   type ActiveSpeedUpgrade,
   type SpeedUpgradeId,
+  type UtilityUpgradeId,
+  type UtilityUpgrade,
 } from '../../domain/upgrades';
 import { useGameStore } from '../../store/useGameStore';
 import { useSoundEffects } from '../../hooks/useSoundEffects';
 import { CatSprite } from '../CatDisplay/CatSprite';
 import './shop.css';
 
-type ShopTab = 'frön' | 'stall' | 'uppgraderingar';
+type ShopTab = 'frön' | 'stall' | 'uppgraderingar' | 'verktyg';
 
-export function Shop() {
+interface ShopProps {
+  onOpenLottery?: () => void;
+}
+
+export function Shop({ onOpenLottery }: ShopProps = {}) {
   const [tab, setTab] = useState<ShopTab>('frön');
   const coins = useGameStore((s) => s.coins);
   const totalEarned = useGameStore((s) => s.totalEarned);
   const catsSold = useGameStore((s) => s.catsSoldByType);
   const seedInventory = useGameStore((s) => s.seedInventory);
   const activeSpeedUpgrade = useGameStore((s) => s.activeSpeedUpgrade);
+  const utilityUpgrades = useGameStore((s) => s.utilityUpgrades);
   const buySeed = useGameStore((s) => s.buySeed);
   const buyUpgrade = useGameStore((s) => s.buyUpgrade);
+  const buyUtilityUpgrade = useGameStore((s) => s.buyUtilityUpgrade);
   const { playBuyUpgrade, playButton } = useSoundEffects();
 
   const seeds = visibleSeeds(totalEarned, catsSold.graskatt ?? 0);
@@ -71,7 +80,28 @@ export function Shop() {
         >
           Uppgraderingar
         </button>
+        <button
+          role="tab"
+          aria-selected={tab === 'verktyg'}
+          className={tab === 'verktyg' ? 'active' : ''}
+          onClick={() => setTab('verktyg')}
+        >
+          Verktyg
+        </button>
       </div>
+
+      {onOpenLottery && (
+        <button
+          type="button"
+          className="shop-lottery-shortcut"
+          onClick={() => {
+            playButton();
+            onOpenLottery();
+          }}
+        >
+          <span aria-hidden="true">🎰</span> Öppna Lyckohjulet
+        </button>
+      )}
 
       {tab === 'frön' && (
         <ul className="shop-list" role="tabpanel">
@@ -122,7 +152,95 @@ export function Shop() {
           }}
         />
       )}
+
+      {tab === 'verktyg' && (
+        <UtilityTab
+          coins={coins}
+          owned={utilityUpgrades}
+          onBuy={(id) => {
+            if (buyUtilityUpgrade(id)) playBuyUpgrade();
+          }}
+        />
+      )}
     </section>
+  );
+}
+
+interface UtilityTabProps {
+  coins: number;
+  owned: UtilityUpgradeId[];
+  onBuy: (id: UtilityUpgradeId) => void;
+}
+
+function UtilityTab({ coins, owned, onBuy }: UtilityTabProps) {
+  return (
+    <div role="tabpanel">
+      <p className="utility-intro">
+        Permanenta verktyg som förbättrar trädgården för alltid.
+      </p>
+      <ul className="shop-list">
+        {UTILITY_UPGRADES.map((u) => (
+          <UtilityCard
+            key={u.id}
+            upgrade={u}
+            owned={owned.includes(u.id)}
+            canAfford={coins >= u.cost}
+            onBuy={() => onBuy(u.id)}
+          />
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+interface UtilityCardProps {
+  upgrade: UtilityUpgrade;
+  owned: boolean;
+  canAfford: boolean;
+  onBuy: () => void;
+}
+
+function UtilityCard({ upgrade, owned, canAfford, onBuy }: UtilityCardProps) {
+  const [shake, setShake] = useState(0);
+  const handleClick = () => {
+    if (owned) return;
+    if (!canAfford) {
+      setShake(shake + 1);
+      return;
+    }
+    onBuy();
+  };
+  return (
+    <motion.li
+      key={`${upgrade.id}-${shake}`}
+      className={['utility-card', owned ? 'owned' : ''].filter(Boolean).join(' ')}
+      animate={shake > 0 ? { x: [0, -6, 6, -4, 4, 0] } : { x: 0 }}
+      transition={{ duration: 0.32 }}
+    >
+      <div className="utility-emoji" aria-hidden="true">
+        {upgrade.emoji}
+      </div>
+      <div className="utility-body">
+        <div className="utility-name">{upgrade.name}</div>
+        <div className="utility-desc">{upgrade.description}</div>
+      </div>
+      <div className="utility-action">
+        {owned ? (
+          <span className="utility-owned-tag">
+            <span aria-hidden="true">✓</span> Ägd
+          </span>
+        ) : (
+          <button
+            type="button"
+            className="utility-buy"
+            disabled={!canAfford}
+            onClick={handleClick}
+          >
+            <CoinDot /> {formatCoins(upgrade.cost)}
+          </button>
+        )}
+      </div>
+    </motion.li>
   );
 }
 

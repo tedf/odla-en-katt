@@ -9,9 +9,12 @@ import { Garden } from './components/Garden/Garden';
 import { Shop } from './components/Shop/Shop';
 import { LotteryWheel } from './components/LotteryWheel/LotteryWheel';
 import { CatDisplay } from './components/CatDisplay/CatDisplay';
+import { Quests } from './components/Quests/Quests';
+import { Achievements } from './components/Achievements/Achievements';
 import { Toasts } from './components/effects/Toasts';
 import { LightningFlash } from './components/effects/LightningFlash';
 import { RecapModal } from './components/effects/RecapModal';
+import { OfflineModal } from './components/effects/OfflineModal';
 import { FloatingCoins } from './components/effects/FloatingCoins';
 import { useGameTick } from './hooks/useGameTick';
 import { useSoundEffects } from './hooks/useSoundEffects';
@@ -19,7 +22,13 @@ import { useGameStore } from './store/useGameStore';
 import './App.css';
 import './components/CatDisplay/cat-sprite.css';
 
-type MobileTab = 'garden' | 'shop' | 'lottery' | 'stall';
+type MobileTab =
+  | 'garden'
+  | 'shop'
+  | 'lottery'
+  | 'stall'
+  | 'quests'
+  | 'achievements';
 
 function App() {
   useGameTick();
@@ -89,13 +98,21 @@ function App() {
 
         <aside className="side-panels">
           <div className={tab === 'shop' ? '' : 'section-hidden-mobile'}>
-            <Shop />
+            <Shop onOpenLottery={() => setTab('lottery')} />
           </div>
           <div className={tab === 'lottery' ? '' : 'section-hidden-mobile'}>
             <LotteryWheel />
           </div>
           <div className={tab === 'stall' ? '' : 'section-hidden-mobile'}>
             <CatDisplay />
+          </div>
+          <div className={tab === 'quests' ? '' : 'section-hidden-mobile'}>
+            <Quests />
+          </div>
+          <div
+            className={tab === 'achievements' ? '' : 'section-hidden-mobile'}
+          >
+            <Achievements />
           </div>
         </aside>
       </main>
@@ -107,11 +124,15 @@ function App() {
         <button aria-pressed={tab === 'shop'} onClick={() => setTab('shop')}>
           Butik
         </button>
+        <button aria-pressed={tab === 'quests'} onClick={() => setTab('quests')}>
+          Uppdrag
+          <QuestNotice />
+        </button>
         <button
-          aria-pressed={tab === 'lottery'}
-          onClick={() => setTab('lottery')}
+          aria-pressed={tab === 'achievements'}
+          onClick={() => setTab('achievements')}
         >
-          Lyckohjul
+          Trofér
         </button>
         <button aria-pressed={tab === 'stall'} onClick={() => setTab('stall')}>
           Stall
@@ -122,8 +143,18 @@ function App() {
       <FloatingCoins />
       <LightningFlash />
       <RecapModal />
+      <OfflineModal />
     </div>
   );
+}
+
+/** Renders a small dot indicator when at least one quest is ready to claim. */
+function QuestNotice() {
+  const readyToClaim = useGameStore((s) =>
+    s.dailyQuests.quests.some((q) => q.completed && !q.rewardClaimed),
+  );
+  if (!readyToClaim) return null;
+  return <span className="tabbar-pip" aria-hidden="true" />;
 }
 
 /**

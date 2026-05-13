@@ -1,8 +1,9 @@
 /**
  * Zustand store — the bridge between pure domain logic and React UI.
  *
- * Holds the entire game state (coins, plots, inventory, lottery state)
- * and exposes actions. Persists to localStorage on every meaningful change.
+ * Holds the entire game state (coins, plots, inventory, lottery state,
+ * cat personalities, daily quests, achievements) and exposes actions.
+ * Persists to localStorage on every meaningful change.
  */
 
 import { create } from 'zustand';
@@ -35,9 +36,10 @@ import {
   loadSave,
   writeSave,
   SAVE_KEY,
+  type HarvestedCatRecord,
+  type SavedAchievementStats,
   type SaveData,
 } from '../domain/persistence';
-import { applyOfflineCatchup } from '../domain/time';
 import {
   activeMultiplier,
   getUpgradeById,
@@ -45,13 +47,34 @@ import {
   pruneExpired,
   type ActiveSpeedUpgrade,
   type SpeedUpgradeId,
+  type UtilityUpgradeId,
+  getUtilityUpgradeById,
 } from '../domain/upgrades';
+import {
+  rollPersonality,
+  traitValueMultiplier,
+  type CatTraitId,
+} from '../domain/catPersonality';
+import { calculateOfflineProgress, type OfflineSummary } from '../domain/offline';
+import {
+  applyQuestProgress,
+  getQuestTemplate,
+  refreshDailyQuests,
+  type DailyQuestsState,
+  type QuestType,
+} from '../domain/quests';
+import {
+  ACHIEVEMENTS_BY_ID,
+  newlyUnlocked,
+  type AchievementStats,
+} from '../domain/achievements';
 
 export interface ToastMessage {
   id: number;
-  kind: 'info' | 'success' | 'lightning' | 'unlock';
+  kind: 'info' | 'success' | 'lightning' | 'unlock' | 'achievement';
   title: string;
   body?: string;
+  emoji?: string;
   createdAt: number;
   ttl: number;
 }
@@ -88,6 +111,17 @@ export interface ActiveWeatherStrike {
   triggeredAt: number;
 }
 
+export interface RecentHarvest {
+  catTypeId: CatTypeId;
+  name: string;
+  traitId: CatTraitId;
+  /** Plot the harvest happened on — used to anchor the popup. */
+  plotIndex: number;
+  /** Increments each harvest so listeners can re-trigger animations. */
+  key: number;
+  createdAt: number;
+}
+
 export interface GameState {
   // ---- save fields ----
   coins: number;
@@ -115,12 +149,24 @@ export interface GameState {
   purchasedUpgrades: SpeedUpgradeId[];
   /** Currently-active speed boost (replaces previous on re-purchase). */
   activeSpeedUpgrade: ActiveSpeedUpgrade | null;
+  /** Permanent utility upgrades (e.g. `auto_harvest`). */
+  utilityUpgrades: UtilityUpgradeId[];
+  /** Personality log per cat type (most recent personalities at the end). */
+  harvestedCats: Partial<Record<CatTypeId, HarvestedCatRecord>>;
+  /** Daily quest state (date-scoped). */
+  dailyQuests: DailyQuestsState;
+  /** Live achievement stats (Set in memory, serialized as array). */
+  achievementStats: AchievementStats;
+  /** Unlocked achievement ids, in unlock-order. */
+  unlockedAchievements: string[];
   lastTickAt: number;
 
   // ---- ephemeral UI state ----
   toasts: ToastMessage[];
   floatingCoins: FloatingCoin[];
   pendingRecap: PendingRecap | null;
+  /** Detailed offline summary modal — separate from pendingRecap. */
+  offlineSummary: OfflineSummary | null;
   /** @deprecated Kept for any consumer still reading the old field. */
   activeStormPlot: number | null;
   /** Currently-animating strike, if any. */
@@ -133,6 +179,8 @@ export interface GameState {
   coinPulseKey: number;
   /** Pulses when the pointer should bounce after the wheel stops. */
   pointerBounceKey: number;
+  /** Last harvested cat with personality — used for in-plot popup. */
+  recentHarvest: RecentHarvest | null;
 
   // ---- actions ----
   tick: () => void;
@@ -140,26 +188,39 @@ export interface GameState {
   harvestCat: (plotIndex: number) => boolean;
   buySeed: (catType: CatTypeId) => boolean;
   buyUpgrade: (upgradeId: SpeedUpgradeId) => boolean;
+  buyUtilityUpgrade: (upgradeId: UtilityUpgradeId) => boolean;
   spinLottery: () => SpinResult | null;
   acknowledgeSpin: () => void;
   toggleReducedMotion: () => void;
   toggleSoundMuted: () => void;
   dismissToast: (id: number) => void;
   dismissRecap: () => void;
+  dismissOfflineSummary: () => void;
+  acceptOfflineHarvest: () => void;
   harvestAllReady: () => void;
   clearFloatingCoin: (id: number) => void;
+  clearRecentHarvest: () => void;
   notifyPointerBounce: () => void;
+  claimQuestReward: (questIndex: number) => void;
+  updateQuestProgress: (
+    type: QuestType,
+    amount: number,
+    meta?: { catTypeId?: CatTypeId; traitId?: string },
+  ) => void;
   forceSave: () => void;
 }
 
 const TOAST_DEFAULT_TTL = 3500;
+const ACHIEVEMENT_TOAST_TTL = 4000;
 const AWAY_RECAP_THRESHOLD_MS = 60_000;
 /** Active strike animation lifetime before activeStrike auto-clears. */
 const STRIKE_DISPLAY_MS = 1800;
+const RECENT_HARVEST_TTL_MS = 2200;
 
 let toastIdCounter = 1;
 let floatingCoinIdCounter = 1;
 let strikeIdCounter = 1;
+let recentHarvestKeyCounter = 1;
 
 function nowMs(): number {
   return Date.now();
@@ -182,18 +243,54 @@ function pushToast(
   kind: ToastMessage['kind'],
   title: string,
   body?: string,
+  emoji?: string,
 ): ToastMessage[] {
   const toast: ToastMessage = {
     id: toastIdCounter++,
     kind,
     title,
     ...(body !== undefined ? { body } : {}),
+    ...(emoji !== undefined ? { emoji } : {}),
     createdAt: nowMs(),
-    ttl: TOAST_DEFAULT_TTL,
+    ttl: kind === 'achievement' ? ACHIEVEMENT_TOAST_TTL : TOAST_DEFAULT_TTL,
   };
   // Keep at most 4 most-recent toasts.
   const next = [...list, toast];
   return next.length > 4 ? next.slice(next.length - 4) : next;
+}
+
+/** Serializes runtime achievement stats (Set → array) for save. */
+function serializeAchievementStats(
+  stats: AchievementStats,
+): SavedAchievementStats {
+  return {
+    totalHarvested: stats.totalHarvested,
+    totalCoinsEarned: stats.totalCoinsEarned,
+    catTypesHarvested: Array.from(stats.catTypesHarvested),
+    weatherEventsExperienced: stats.weatherEventsExperienced,
+    lotteriesSpun: stats.lotteriesSpun,
+    upgradesPurchased: stats.upgradesPurchased,
+    longestStreak: stats.longestStreak,
+    meteorHits: stats.meteorHits,
+    harvestedWithMagicalTrait: stats.harvestedWithMagicalTrait,
+  };
+}
+
+/** Inflates saved stats back into the runtime shape (array → Set). */
+function inflateAchievementStats(
+  saved: SavedAchievementStats,
+): AchievementStats {
+  return {
+    totalHarvested: saved.totalHarvested,
+    totalCoinsEarned: saved.totalCoinsEarned,
+    catTypesHarvested: new Set(saved.catTypesHarvested),
+    weatherEventsExperienced: saved.weatherEventsExperienced,
+    lotteriesSpun: saved.lotteriesSpun,
+    upgradesPurchased: saved.upgradesPurchased,
+    longestStreak: saved.longestStreak,
+    meteorHits: saved.meteorHits,
+    harvestedWithMagicalTrait: saved.harvestedWithMagicalTrait,
+  };
 }
 
 function persistFromState(state: GameState): void {
@@ -211,6 +308,11 @@ function persistFromState(state: GameState): void {
     settings: state.settings,
     purchasedUpgrades: state.purchasedUpgrades,
     activeSpeedUpgrade: state.activeSpeedUpgrade,
+    utilityUpgrades: state.utilityUpgrades,
+    harvestedCats: state.harvestedCats,
+    dailyQuests: state.dailyQuests,
+    achievementStats: serializeAchievementStats(state.achievementStats),
+    unlockedAchievements: state.unlockedAchievements,
     lastTickAt: state.lastTickAt,
   };
   writeSave(data);
@@ -223,15 +325,21 @@ type InitialStateFields = Omit<
   | 'harvestCat'
   | 'buySeed'
   | 'buyUpgrade'
+  | 'buyUtilityUpgrade'
   | 'spinLottery'
   | 'acknowledgeSpin'
   | 'toggleReducedMotion'
   | 'toggleSoundMuted'
   | 'dismissToast'
   | 'dismissRecap'
+  | 'dismissOfflineSummary'
+  | 'acceptOfflineHarvest'
   | 'harvestAllReady'
   | 'clearFloatingCoin'
+  | 'clearRecentHarvest'
   | 'notifyPointerBounce'
+  | 'claimQuestReward'
+  | 'updateQuestProgress'
   | 'forceSave'
 >;
 
@@ -250,43 +358,90 @@ function bootstrapInitialState(): InitialStateFields {
     return { ...p, unlocked: save.totalEarned >= threshold };
   });
 
-  // Offline catch-up — active speed boost compresses elapsed time, but only
-  // for the portion of the away window where the boost was still live.
-  // For simplicity we use the boost multiplier if it has not yet expired at
-  // `now`; expired boosts contribute 1x. (Strict partial-window accounting
-  // would require splitting the catch-up into segments; not done yet.)
+  // Offline catch-up with personalities, auto-harvest support, etc.
   const activeOnLoad = pruneExpired(save.activeSpeedUpgrade, now);
   const speedMult = activeMultiplier(activeOnLoad, now);
-  const awayMs = Math.max(0, now - save.lastTickAt);
-  const { plots: caughtUp, recap } = applyOfflineCatchup(
+  const autoHarvest = save.utilityUpgrades.includes('auto_harvest');
+  const summary = calculateOfflineProgress(
     unlockedPlots,
+    save.lastTickAt,
     now,
-    awayMs,
     speedMult,
+    autoHarvest,
   );
 
-  const pendingRecap: PendingRecap | null =
-    hasSave && awayMs >= AWAY_RECAP_THRESHOLD_MS && recap.totalPlotsAffected > 0
-      ? { readyPlots: recap.readyPlots, awayMs }
-      : null;
+  // Apply offline auto-harvest earnings to coin balances + stats.
+  let coins = save.coins + summary.coinsEarned;
+  let totalEarned = save.totalEarned + summary.coinsEarned;
+  let catsSold = { ...save.catsSoldByType };
+  let harvestedCats: Partial<Record<CatTypeId, HarvestedCatRecord>> = {
+    ...save.harvestedCats,
+  };
+  const runtimeStats = inflateAchievementStats(save.achievementStats);
+
+  for (const c of summary.completedPlots) {
+    catsSold[c.catTypeId] = (catsSold[c.catTypeId] ?? 0) + 1;
+    runtimeStats.totalHarvested += 1;
+    runtimeStats.catTypesHarvested.add(c.catTypeId);
+    if (c.traitId === 'magical') runtimeStats.harvestedWithMagicalTrait += 1;
+    const prev =
+      harvestedCats[c.catTypeId] ??
+      ({ catTypeId: c.catTypeId, count: 0, personalities: [] } as HarvestedCatRecord);
+    harvestedCats[c.catTypeId] = {
+      catTypeId: c.catTypeId,
+      count: prev.count + 1,
+      personalities: [
+        ...prev.personalities,
+        { name: c.catName, traitId: c.traitId, weatherBonus: c.weatherBonus },
+      ],
+    };
+  }
+  runtimeStats.totalCoinsEarned += summary.coinsEarned;
+
+  // Daily quests: refresh if date changed.
+  const today = localDateString(now);
+  const dailyQuests =
+    !save.dailyQuests || save.dailyQuests.date !== today
+      ? refreshDailyQuests(save.dailyQuests, today)
+      : save.dailyQuests;
+
+  // Update streak in achievement stats from quests data.
+  runtimeStats.longestStreak = Math.max(
+    runtimeStats.longestStreak,
+    dailyQuests.streak,
+  );
+
+  const showOfflineSummary =
+    hasSave &&
+    summary.awayMs >= AWAY_RECAP_THRESHOLD_MS &&
+    (summary.completedPlots.length > 0 || summary.readyPlots.length > 0);
+
+  // Legacy pendingRecap is suppressed when the rich OfflineModal will fire.
+  const pendingRecap: PendingRecap | null = null;
 
   return {
-    coins: save.coins,
-    totalEarned: save.totalEarned,
-    plots: caughtUp,
+    coins,
+    totalEarned,
+    plots: summary.plots,
     seedInventory: save.seedInventory,
     unlockedCatTypes: save.unlockedCatTypes,
-    catsSoldByType: save.catsSoldByType,
+    catsSoldByType: catsSold,
     lastStormAt: save.lastStormAt,
     weatherCooldowns: save.weatherCooldowns ?? {},
     lottery: save.lottery,
     settings: save.settings,
     purchasedUpgrades: save.purchasedUpgrades,
     activeSpeedUpgrade: activeOnLoad,
+    utilityUpgrades: save.utilityUpgrades,
+    harvestedCats,
+    dailyQuests,
+    achievementStats: runtimeStats,
+    unlockedAchievements: save.unlockedAchievements,
     lastTickAt: now,
     toasts: [],
     floatingCoins: [],
     pendingRecap,
+    offlineSummary: showOfflineSummary ? summary : null,
     activeStormPlot: null,
     activeStrike: null,
     lastSpin: null,
@@ -294,7 +449,75 @@ function bootstrapInitialState(): InitialStateFields {
     lotteryResultKey: 0,
     coinPulseKey: 0,
     pointerBounceKey: 0,
+    recentHarvest: null,
   };
+}
+
+/**
+ * Checks for newly-unlocked achievements and merges them into state.
+ * Returns the patch fragments and the unlocked-list of ids (for sound etc).
+ */
+function processAchievementUnlocks(
+  state: GameState,
+): Pick<GameState, 'unlockedAchievements' | 'coins' | 'seedInventory' | 'toasts'> & {
+  newlyUnlockedIds: string[];
+  totalEarnedDelta: number;
+} {
+  const fresh = newlyUnlocked(state.achievementStats, state.unlockedAchievements);
+  if (fresh.length === 0) {
+    return {
+      unlockedAchievements: state.unlockedAchievements,
+      coins: state.coins,
+      seedInventory: state.seedInventory,
+      toasts: state.toasts,
+      newlyUnlockedIds: [],
+      totalEarnedDelta: 0,
+    };
+  }
+  let coins = state.coins;
+  let totalEarnedDelta = 0;
+  const inv: Record<CatTypeId, number> = { ...state.seedInventory };
+  let toasts = state.toasts;
+  for (const id of fresh) {
+    const a = ACHIEVEMENTS_BY_ID[id];
+    if (!a) continue;
+    if (a.reward.coins) {
+      coins += a.reward.coins;
+      totalEarnedDelta += a.reward.coins;
+    }
+    if (a.reward.seedId) {
+      inv[a.reward.seedId] = (inv[a.reward.seedId] ?? 0) + 1;
+    }
+    const rewardSummary = describeAchievementReward(a.reward);
+    toasts = pushToast(
+      toasts,
+      'achievement',
+      a.title,
+      rewardSummary,
+      a.emoji,
+    );
+  }
+  return {
+    unlockedAchievements: [...state.unlockedAchievements, ...fresh],
+    coins,
+    seedInventory: inv,
+    toasts,
+    newlyUnlockedIds: fresh,
+    totalEarnedDelta,
+  };
+}
+
+function describeAchievementReward(reward: {
+  coins?: number;
+  seedId?: CatTypeId;
+}): string {
+  const parts: string[] = [];
+  if (reward.coins) parts.push(`+${reward.coins} mynt`);
+  if (reward.seedId) {
+    const cat = CAT_TYPES[reward.seedId];
+    parts.push(`+1 ${cat.name}-frö`);
+  }
+  return parts.join(' · ');
 }
 
 export const useGameStore = create<GameState>((set, get) => ({
@@ -303,8 +526,15 @@ export const useGameStore = create<GameState>((set, get) => ({
   tick: () => {
     const state = get();
     const now = nowMs();
-    // Prune expired upgrade first so all downstream growth math uses the
-    // post-expiry multiplier within the same tick.
+
+    // 0. Daily-quest rollover at local midnight.
+    const today = localDateString(now);
+    let dailyQuests = state.dailyQuests;
+    if (state.dailyQuests.date !== today) {
+      dailyQuests = refreshDailyQuests(state.dailyQuests, today);
+    }
+
+    // Prune expired upgrade so growth math uses post-expiry multiplier.
     const prevActive = state.activeSpeedUpgrade;
     const pruned = pruneExpired(prevActive, now);
     let activeSpeedUpgrade: ActiveSpeedUpgrade | null = pruned;
@@ -318,28 +548,33 @@ export const useGameStore = create<GameState>((set, get) => ({
     let toasts = state.toasts;
     let changed = false;
 
-    // 1. Mature growing plots into ready (speed multiplier accelerates ripening).
+    // Auto-harvest hook: track which plots became ready this tick so we can
+    // optionally trigger an auto-harvest action after the tick body.
+    const autoHarvest = state.utilityUpgrades.includes('auto_harvest');
+    const newlyReady: number[] = [];
+
+    // 1. Mature growing plots into ready.
     plots = plots.map((p) => {
       if (isMature(p, now, speedMult)) {
         changed = true;
+        newlyReady.push(p.index);
         return markReady(p);
       }
       return p;
     });
 
-    // 2. Roll weather events. We bias rarer events first via rollAnyWeatherEvent
-    // so a lucky tick favors the bigger spectacle. One event per tick max.
+    // 2. Roll weather events.
     const growingIndices = plots
       .map((p, i) => (p.state === 'growing' ? i : -1))
       .filter((i) => i >= 0);
 
+    let weatherFired: WeatherEvent | null = null;
     if (growingIndices.length > 0) {
       const event: WeatherEvent | null = rollAnyWeatherEvent(
         weatherCooldowns,
         now,
       );
       if (event) {
-        // Pick a random growing plot for the event to strike.
         const pickIdx =
           growingIndices[Math.floor(Math.random() * growingIndices.length)] ??
           growingIndices[0];
@@ -372,12 +607,12 @@ export const useGameStore = create<GameState>((set, get) => ({
             `${event.emoji} ${event.name}!`,
             `Plot ${pickIdx + 1} fick +${bonusPct}% värde`,
           );
+          weatherFired = event;
           changed = true;
         }
       }
     }
 
-    // Auto-clear active strike after STRIKE_DISPLAY_MS so animations finish.
     if (activeStrike && now - activeStrike.triggeredAt > STRIKE_DISPLAY_MS) {
       activeStrike = null;
     }
@@ -387,8 +622,6 @@ export const useGameStore = create<GameState>((set, get) => ({
       }
     }
 
-    // Surface a friendly toast the first tick after a boost expires so the
-    // player understands why their growth slowed down.
     let speedUpgradeJustExpired = false;
     if (prevActive && !pruned) {
       const u = getUpgradeById(prevActive.upgradeId);
@@ -402,8 +635,29 @@ export const useGameStore = create<GameState>((set, get) => ({
       speedUpgradeJustExpired = true;
     }
 
-    // 3. Cull expired toasts by ttl.
+    // Cull expired toasts.
     toasts = toasts.filter((t) => now - t.createdAt < t.ttl);
+
+    // Recent harvest auto-clear.
+    let recentHarvest = state.recentHarvest;
+    if (recentHarvest && now - recentHarvest.createdAt > RECENT_HARVEST_TTL_MS) {
+      recentHarvest = null;
+    }
+
+    // Update achievement stats from weather fired.
+    let achievementStats = state.achievementStats;
+    if (weatherFired) {
+      achievementStats = {
+        ...state.achievementStats,
+        catTypesHarvested: new Set(state.achievementStats.catTypesHarvested),
+        weatherEventsExperienced:
+          state.achievementStats.weatherEventsExperienced + 1,
+        meteorHits:
+          state.achievementStats.meteorHits +
+          (weatherFired.id === 'meteor' ? 1 : 0),
+      };
+      // Propagate weather quest progress (mutation through action below).
+    }
 
     set({
       plots,
@@ -413,10 +667,26 @@ export const useGameStore = create<GameState>((set, get) => ({
       activeStrike,
       activeSpeedUpgrade,
       toasts,
+      dailyQuests,
+      achievementStats,
+      recentHarvest,
       lastTickAt: now,
     });
 
-    if (changed || speedUpgradeJustExpired) {
+    if (weatherFired) {
+      // Update quest progress + check achievements.
+      get().updateQuestProgress('weather_event', 1);
+      checkAchievementsInline(set, get);
+    }
+
+    // Auto-harvest newly-ready plots if owner.
+    if (autoHarvest && newlyReady.length > 0) {
+      for (const idx of newlyReady) {
+        get().harvestCat(idx);
+      }
+    }
+
+    if (changed || speedUpgradeJustExpired || weatherFired) {
       persistFromState(get());
     }
   },
@@ -455,8 +725,11 @@ export const useGameStore = create<GameState>((set, get) => ({
     const plot = state.plots[plotIndex];
     if (!plot || plot.state !== 'ready' || plot.catType === null) return false;
 
-    const value = effectiveSellValue(plot);
+    const baseValue = effectiveSellValue(plot);
     const catId = plot.catType;
+    const { name, traitId } = rollPersonality();
+    const traitMult = traitValueMultiplier(traitId);
+    const value = Math.max(0, Math.round(baseValue * traitMult));
     const newCoins = state.coins + value;
     const newTotalEarned = state.totalEarned + value;
 
@@ -483,11 +756,9 @@ export const useGameStore = create<GameState>((set, get) => ({
       );
     }
 
-    // Per-type sold counter
     const newCatsSold: Record<CatTypeId, number> = { ...state.catsSoldByType };
     newCatsSold[catId] = (newCatsSold[catId] ?? 0) + 1;
 
-    // Unlocked cat types (for shop visibility)
     let unlockedTypes = state.unlockedCatTypes;
     for (const id of Object.keys(CAT_TYPES) as CatTypeId[]) {
       const c = CAT_TYPES[id];
@@ -510,6 +781,32 @@ export const useGameStore = create<GameState>((set, get) => ({
       plotIndex,
     };
 
+    // Personality log.
+    const prevRecord = state.harvestedCats[catId];
+    const harvestedCats: Partial<Record<CatTypeId, HarvestedCatRecord>> = {
+      ...state.harvestedCats,
+      [catId]: {
+        catTypeId: catId,
+        count: (prevRecord?.count ?? 0) + 1,
+        personalities: [
+          ...(prevRecord?.personalities ?? []),
+          { name, traitId, weatherBonus: plot.lightningBonus },
+        ],
+      },
+    };
+
+    // Achievement stats (immutable copy of Set).
+    const achievementStats: AchievementStats = {
+      ...state.achievementStats,
+      catTypesHarvested: new Set(state.achievementStats.catTypesHarvested),
+      totalHarvested: state.achievementStats.totalHarvested + 1,
+      totalCoinsEarned: state.achievementStats.totalCoinsEarned + value,
+      harvestedWithMagicalTrait:
+        state.achievementStats.harvestedWithMagicalTrait +
+        (traitId === 'magical' ? 1 : 0),
+    };
+    achievementStats.catTypesHarvested.add(catId);
+
     set({
       coins: newCoins,
       totalEarned: newTotalEarned,
@@ -517,9 +814,33 @@ export const useGameStore = create<GameState>((set, get) => ({
       toasts,
       catsSoldByType: newCatsSold,
       unlockedCatTypes: unlockedTypes,
+      harvestedCats,
+      achievementStats,
       floatingCoins: [...state.floatingCoins, floater],
       coinPulseKey: state.coinPulseKey + 1,
+      recentHarvest: {
+        catTypeId: catId,
+        name,
+        traitId,
+        plotIndex,
+        key: recentHarvestKeyCounter++,
+        createdAt: nowMs(),
+      },
     });
+
+    // Quest progress (separate from sell-coins — harvest_any + sell_coins both fire).
+    get().updateQuestProgress('harvest_any', 1, { catTypeId: catId, traitId });
+    get().updateQuestProgress('harvest_type', 1, {
+      catTypeId: catId,
+      traitId,
+    });
+    get().updateQuestProgress('harvest_with_trait', 1, {
+      catTypeId: catId,
+      traitId,
+    });
+    get().updateQuestProgress('sell_coins', value);
+
+    checkAchievementsInline(set, get);
     persistFromState(get());
     return true;
   },
@@ -576,6 +897,11 @@ export const useGameStore = create<GameState>((set, get) => ({
     set({
       coins: state.coins - upgrade.cost,
       activeSpeedUpgrade: next,
+      achievementStats: {
+        ...state.achievementStats,
+        catTypesHarvested: new Set(state.achievementStats.catTypesHarvested),
+        upgradesPurchased: state.achievementStats.upgradesPurchased + 1,
+      },
       toasts: pushToast(
         state.toasts,
         'success',
@@ -583,6 +909,28 @@ export const useGameStore = create<GameState>((set, get) => ({
         replacing
           ? `Ersatte föregående boost — nu ${upgrade.multiplier}x i ${upgrade.description.split(' i ')[1] ?? formatDurationShort(upgrade.durationSeconds)}.`
           : `Odlingen är nu ${upgrade.multiplier}x snabbare i ${upgrade.description.split(' i ')[1] ?? formatDurationShort(upgrade.durationSeconds)}.`,
+      ),
+    });
+    checkAchievementsInline(set, get);
+    persistFromState(get());
+    return true;
+  },
+
+  buyUtilityUpgrade: (upgradeId) => {
+    const state = get();
+    const upgrade = getUtilityUpgradeById(upgradeId);
+    if (!upgrade) return false;
+    if (state.utilityUpgrades.includes(upgradeId)) return false;
+    if (state.coins < upgrade.cost) return false;
+
+    set({
+      coins: state.coins - upgrade.cost,
+      utilityUpgrades: [...state.utilityUpgrades, upgradeId],
+      toasts: pushToast(
+        state.toasts,
+        'success',
+        `${upgrade.emoji} ${upgrade.name} köpt!`,
+        upgrade.description,
       ),
     });
     persistFromState(get());
@@ -642,7 +990,6 @@ export const useGameStore = create<GameState>((set, get) => ({
       toasts = pushToast(toasts, 'success', `Vinst: ${prize.label}!`);
     }
 
-    // Plot unlocks for newly-added totalEarned (lottery coin prizes)
     const unlockedPlotIndices = plotsUnlockedBy(state.totalEarned, totalEarned);
     let plots = state.plots;
     for (const idx of unlockedPlotIndices) {
@@ -655,14 +1002,20 @@ export const useGameStore = create<GameState>((set, get) => ({
       );
     }
 
-    // spinAngle is informational only; the LotteryWheel component computes
-    // its own delta from the current rotation so it always lands precisely
-    // under the pointer (see component for the geometry comment).
     const sectorAngle = 360 / LOTTERY_SECTORS.length;
     const sectorCenter = sectorIndex * sectorAngle + sectorAngle / 2;
     const spinAngle = 5 * 360 + ((360 - sectorCenter) % 360);
 
     const result: SpinResult = { sectorIndex, spinAngle };
+
+    const achievementStats: AchievementStats = {
+      ...state.achievementStats,
+      catTypesHarvested: new Set(state.achievementStats.catTypesHarvested),
+      lotteriesSpun: state.achievementStats.lotteriesSpun + 1,
+      totalCoinsEarned:
+        state.achievementStats.totalCoinsEarned +
+        (prize.kind === 'coins' && prize.coins ? prize.coins : 0),
+    };
 
     set({
       coins: newCoins,
@@ -680,7 +1033,11 @@ export const useGameStore = create<GameState>((set, get) => ({
       lotterySpinKey: state.lotterySpinKey + 1,
       coinPulseKey:
         prize.kind === 'coins' ? state.coinPulseKey + 1 : state.coinPulseKey,
+      achievementStats,
     });
+
+    get().updateQuestProgress('spin_lottery', 1);
+    checkAchievementsInline(set, get);
     persistFromState(get());
     return result;
   },
@@ -711,12 +1068,140 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
 
   dismissRecap: () => set({ pendingRecap: null }),
+  dismissOfflineSummary: () => set({ offlineSummary: null }),
+
+  acceptOfflineHarvest: () => {
+    // If there are non-auto-harvested ready plots from the offline summary,
+    // harvest them all now.
+    const state = get();
+    if (!state.offlineSummary) return;
+    const readyIndices = state.offlineSummary.readyPlots.map((r) => r.plotIndex);
+    set({ offlineSummary: null, pendingRecap: null });
+    for (const idx of readyIndices) {
+      get().harvestCat(idx);
+    }
+  },
 
   clearFloatingCoin: (id) => {
     set({ floatingCoins: get().floatingCoins.filter((c) => c.id !== id) });
+  },
+
+  clearRecentHarvest: () => set({ recentHarvest: null }),
+
+  updateQuestProgress: (type, amount, meta) => {
+    const state = get();
+    const nextQuests = applyQuestProgress(
+      state.dailyQuests.quests,
+      type,
+      amount,
+      meta,
+    );
+    if (nextQuests === state.dailyQuests.quests) return;
+    set({
+      dailyQuests: { ...state.dailyQuests, quests: nextQuests },
+    });
+    persistFromState(get());
+  },
+
+  claimQuestReward: (questIndex) => {
+    const state = get();
+    const entry = state.dailyQuests.quests[questIndex];
+    if (!entry || !entry.completed || entry.rewardClaimed) return;
+    const template = getQuestTemplate(entry.templateId);
+    if (!template) return;
+
+    const newInv: Record<CatTypeId, number> = { ...state.seedInventory };
+    let coins = state.coins + template.reward.coins;
+    let totalEarned = state.totalEarned + template.reward.coins;
+    if (template.reward.seedId) {
+      newInv[template.reward.seedId] =
+        (newInv[template.reward.seedId] ?? 0) + 1;
+    }
+
+    const nextQuests = state.dailyQuests.quests.map((q, i) =>
+      i === questIndex ? { ...q, rewardClaimed: true } : q,
+    );
+
+    // Bump streak if this is the first claim today.
+    const hadAnyClaimed = state.dailyQuests.quests.some(
+      (q) => q.rewardClaimed,
+    );
+    const streak = hadAnyClaimed
+      ? state.dailyQuests.streak
+      : state.dailyQuests.streak + 1;
+
+    let toasts = pushToast(
+      state.toasts,
+      'success',
+      `Uppdrag klart!`,
+      `${template.title} · +${template.reward.coins} mynt`,
+    );
+    if (template.reward.seedId) {
+      const cat = CAT_TYPES[template.reward.seedId];
+      toasts = pushToast(
+        toasts,
+        'unlock',
+        `Bonus: ${cat.name}-frö!`,
+        'Lägg i butiken för att plantera',
+      );
+    }
+
+    const achievementStats: AchievementStats = {
+      ...state.achievementStats,
+      catTypesHarvested: new Set(state.achievementStats.catTypesHarvested),
+      totalCoinsEarned:
+        state.achievementStats.totalCoinsEarned + template.reward.coins,
+      longestStreak: Math.max(state.achievementStats.longestStreak, streak),
+    };
+
+    set({
+      coins,
+      totalEarned,
+      seedInventory: newInv,
+      dailyQuests: {
+        ...state.dailyQuests,
+        quests: nextQuests,
+        streak,
+        lastCompletedDate: state.dailyQuests.date,
+      },
+      toasts,
+      achievementStats,
+      coinPulseKey: state.coinPulseKey + 1,
+    });
+    checkAchievementsInline(set, get);
+    persistFromState(get());
   },
 
   forceSave: () => {
     persistFromState(get());
   },
 }));
+
+/**
+ * After mutating achievement stats, call this to detect newly-unlocked
+ * achievements, apply their rewards, and queue toasts.
+ *
+ * Note: this is intentionally module-scoped (not an action method) so we
+ * can call it from inside other actions without re-binding `this`.
+ */
+function checkAchievementsInline(
+  set: (
+    partial:
+      | Partial<GameState>
+      | ((state: GameState) => Partial<GameState>),
+  ) => void,
+  get: () => GameState,
+): void {
+  const state = get();
+  const result = processAchievementUnlocks(state);
+  if (result.newlyUnlockedIds.length === 0) return;
+  set({
+    coins: result.coins,
+    seedInventory: result.seedInventory,
+    toasts: result.toasts,
+    unlockedAchievements: result.unlockedAchievements,
+    totalEarned: state.totalEarned + result.totalEarnedDelta,
+    coinPulseKey:
+      result.totalEarnedDelta > 0 ? state.coinPulseKey + 1 : state.coinPulseKey,
+  });
+}

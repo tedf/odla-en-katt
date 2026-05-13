@@ -111,6 +111,39 @@
   font-weight: 600;
 }
 
+.cat-row-personality {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+  font-size: var(--text-micro);
+  color: var(--color-text-soft);
+  min-width: 0;
+  flex-wrap: wrap;
+  row-gap: 2px;
+}
+
+.cat-row-personality-name {
+  font-family: var(--font-display);
+  font-weight: 700;
+  color: var(--color-text);
+  font-size: 0.78rem;
+  font-style: italic;
+}
+
+.cat-row-trait-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 7px 2px;
+  border-radius: var(--radius-pill);
+  background: rgba(167, 139, 250, 0.16);
+  color: #5b3aaa;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.68rem;
+}
+
 .cat-row-badges {
   display: flex;
   gap: 4px;

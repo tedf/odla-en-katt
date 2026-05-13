@@ -130,3 +130,51 @@ export function getUpgradeById(id: string): SpeedUpgrade | null {
 export function isValidUpgradeId(id: string): id is SpeedUpgradeId {
   return SPEED_UPGRADES.some((u) => u.id === id);
 }
+
+// ---------------------------------------------------------------------------
+// Utility upgrades — permanent one-time purchases that unlock new behaviour
+// (e.g. auto-harvest). Separate catalogue so the speed-boost UI/state stays
+// clean.
+// ---------------------------------------------------------------------------
+
+export type UtilityUpgradeId = 'auto_harvest';
+
+export interface UtilityUpgrade {
+  id: UtilityUpgradeId;
+  name: string;
+  emoji: string;
+  cost: number;
+  description: string;
+  /** Always true today; reserved for future repeatable utility items. */
+  isPermanent: true;
+}
+
+export const UTILITY_UPGRADES: readonly UtilityUpgrade[] = [
+  {
+    id: 'auto_harvest',
+    name: 'Auto-Skörda',
+    emoji: '🤖',
+    cost: 5000,
+    description:
+      'Katter skördas automatiskt när de är klara — även offline!',
+    isPermanent: true,
+  },
+];
+
+export const UTILITY_UPGRADES_BY_ID: Readonly<
+  Record<UtilityUpgradeId, UtilityUpgrade>
+> = UTILITY_UPGRADES.reduce(
+  (acc, u) => {
+    acc[u.id] = u;
+    return acc;
+  },
+  {} as Record<UtilityUpgradeId, UtilityUpgrade>,
+);
+
+export function getUtilityUpgradeById(id: string): UtilityUpgrade | null {
+  return (UTILITY_UPGRADES_BY_ID as Record<string, UtilityUpgrade>)[id] ?? null;
+}
+
+export function isValidUtilityUpgradeId(id: string): id is UtilityUpgradeId {
+  return id in UTILITY_UPGRADES_BY_ID;
+}
