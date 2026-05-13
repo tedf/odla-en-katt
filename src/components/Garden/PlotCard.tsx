@@ -33,6 +33,7 @@ interface PlotCardProps {
 export function PlotCard({ plot }: PlotCardProps) {
   const [showSheet, setShowSheet] = useState(false);
   const [now, setNow] = useState(Date.now());
+  const [splatKey, setSplatKey] = useState<number | null>(null);
   const activeStrike = useGameStore((s) => s.activeStrike);
   const plantSeed = useGameStore((s) => s.plantSeed);
   const harvestCat = useGameStore((s) => s.harvestCat);
@@ -74,6 +75,7 @@ export function PlotCard({ plot }: PlotCardProps) {
   const classes = ['plot-card'];
   if (plot.state === 'ready') classes.push('is-ready');
   if (plot.state === 'empty') classes.push('is-empty');
+  if (splatKey !== null) classes.push('just-planted');
   if (myStrike) {
     classes.push('fx-active');
     classes.push(`fx-${myStrike.eventId}`);
@@ -142,7 +144,33 @@ export function PlotCard({ plot }: PlotCardProps) {
               key={`particles-${myStrike.id}`}
               eventId={myStrike.eventId}
             />
+            <WeatherSpecial
+              key={`special-${myStrike.id}`}
+              eventId={myStrike.eventId}
+            />
           </>
+        )}
+
+        {splatKey !== null && plot.state === 'growing' && (
+          <div className="plot-planting-splat" aria-hidden="true">
+            <span className="splat-blob" />
+            {Array.from({ length: 6 }, (_, i) => {
+              const angle = (i / 6) * Math.PI * 2;
+              const dx = Math.cos(angle) * 36;
+              const dy = Math.sin(angle) * 28;
+              return (
+                <span
+                  key={i}
+                  className="splat-dust"
+                  style={{
+                    ['--dust-dx' as string]: `${dx}px`,
+                    ['--dust-dy' as string]: `${dy}px`,
+                    animationDelay: `${i * 30}ms`,
+                  }}
+                />
+              );
+            })}
+          </div>
         )}
 
         <div className="plot-inner">
@@ -198,6 +226,11 @@ export function PlotCard({ plot }: PlotCardProps) {
               if (ok) {
                 playPlant();
                 setShowSheet(false);
+                const key = Date.now();
+                setSplatKey(key);
+                window.setTimeout(() => {
+                  setSplatKey((current) => (current === key ? null : current));
+                }, 900);
               }
             }}
           />
@@ -328,6 +361,48 @@ function ariaLabelFor(plot: PlotState, now: number, speedMult: number): string {
     return `Plot ${plot.index + 1}: ${cat.name} redo att skördas`;
   }
   return `Plot ${plot.index + 1}`;
+}
+
+/**
+ * Per-event extra visual flair: a hand-drawn lightning bolt for lightning,
+ * a spinning vortex for tornado, a falling meteor + shockwave for meteor.
+ */
+function WeatherSpecial({ eventId }: { eventId: string }) {
+  if (eventId === 'lightning') {
+    return (
+      <div className="plot-lightning-bolt" aria-hidden="true">
+        <svg viewBox="0 0 64 64">
+          <path
+            d="M36 4 L18 32 L30 32 L24 60 L46 28 L34 28 Z"
+            strokeLinejoin="round"
+          />
+        </svg>
+      </div>
+    );
+  }
+  if (eventId === 'tornado') {
+    return (
+      <>
+        <div className="plot-tornado-vortex" aria-hidden="true" />
+        <div
+          className="plot-tornado-vortex"
+          style={{ inset: '25%', animationDelay: '0.15s', borderColor: 'rgba(167,139,250,0.45)' }}
+          aria-hidden="true"
+        />
+      </>
+    );
+  }
+  if (eventId === 'meteor') {
+    return (
+      <>
+        <span className="plot-meteor-fall" aria-hidden="true">
+          ☄️
+        </span>
+        <span className="plot-meteor-shock" aria-hidden="true" />
+      </>
+    );
+  }
+  return null;
 }
 
 function WeatherParticles({ eventId }: { eventId: string }) {

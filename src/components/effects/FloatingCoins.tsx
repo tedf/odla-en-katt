@@ -1,22 +1,24 @@
 /**
- * FloatingCoins — renders queued floating "+N mynt" numbers from the store.
- * They float up from their origin and fade out.
+ * FloatingCoins — renders queued floating "+N mynt" labels plus a coin
+ * cascade (small coin dots that arc up to the HUD counter).
  */
 
 import { AnimatePresence, motion } from 'framer-motion';
 import { useGameStore } from '../../store/useGameStore';
 import { formatCoins } from '../../domain/time';
+import { useReducedMotion } from '../../hooks/useReducedMotion';
+
+const CASCADE_COUNT = 8;
 
 export function FloatingCoins() {
   const items = useGameStore((s) => s.floatingCoins);
   const clear = useGameStore((s) => s.clearFloatingCoin);
+  const reduced = useReducedMotion();
 
   return (
     <div className="floating-coins-layer" aria-hidden="true">
       <AnimatePresence>
         {items.map((c) => {
-          // Spread horizontally by plot index so simultaneous floats don't
-          // overlap completely. Center near the middle when plotIndex is null.
           const offsetX =
             c.plotIndex === null ? 0 : (c.plotIndex - 2.5) * 18;
           return (
@@ -41,6 +43,37 @@ export function FloatingCoins() {
             </motion.span>
           );
         })}
+        {!reduced &&
+          items.flatMap((c) =>
+            Array.from({ length: CASCADE_COUNT }, (_, i) => {
+              const baseX = c.plotIndex === null ? 0 : (c.plotIndex - 2.5) * 18;
+              const angle = (i / CASCADE_COUNT) * 2 * Math.PI;
+              const radius = 50 + (i % 3) * 18;
+              const targetX = baseX + Math.cos(angle) * radius - 10;
+              return (
+                <motion.span
+                  key={`cascade-${c.id}-${i}`}
+                  className="coin-cascade-dot"
+                  initial={{ x: baseX, y: 0, opacity: 0, scale: 0.5 }}
+                  animate={{
+                    x: targetX,
+                    y: -100 - (i % 4) * 14,
+                    opacity: [0, 1, 1, 0],
+                    scale: [0.5, 1.1, 0.9, 0.4],
+                    rotate: i * 22,
+                  }}
+                  transition={{
+                    duration: 1.4,
+                    delay: i * 0.06,
+                    ease: [0.16, 1, 0.3, 1],
+                    times: [0, 0.15, 0.7, 1],
+                  }}
+                >
+                  🪙
+                </motion.span>
+              );
+            }),
+          )}
       </AnimatePresence>
     </div>
   );

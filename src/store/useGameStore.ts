@@ -101,6 +101,31 @@ interface FloatingCoin {
   plotIndex: number | null;
 }
 
+export interface HarvestReveal {
+  /** Re-trigger key for animation. */
+  id: number;
+  catTypeId: CatTypeId;
+  rarity: string;
+  /** Plot the harvest came from — used to anchor coin cascade origin. */
+  plotIndex: number;
+  createdAt: number;
+}
+
+export interface FireworksBurst {
+  id: number;
+  /** Optional rarity tint — used for lottery + achievement variants. */
+  tint: string;
+  createdAt: number;
+}
+
+export interface SellPopUp {
+  id: number;
+  amount: number;
+  rarity: string;
+  plotIndex: number;
+  createdAt: number;
+}
+
 export interface ActiveWeatherStrike {
   /** Ephemeral monotonic id used as React key for re-trigger animations. */
   id: number;
@@ -181,6 +206,12 @@ export interface GameState {
   pointerBounceKey: number;
   /** Last harvested cat with personality — used for in-plot popup. */
   recentHarvest: RecentHarvest | null;
+  /** Active full-screen harvest reveal animation. */
+  harvestReveal: HarvestReveal | null;
+  /** Pending fireworks bursts (achievements, lottery rare wins). */
+  fireworks: FireworksBurst[];
+  /** Floating sell pop-ups (the big "+1250" number above plots). */
+  sellPopUps: SellPopUp[];
 
   // ---- actions ----
   tick: () => void;
@@ -200,6 +231,9 @@ export interface GameState {
   harvestAllReady: () => void;
   clearFloatingCoin: (id: number) => void;
   clearRecentHarvest: () => void;
+  clearHarvestReveal: () => void;
+  clearFirework: (id: number) => void;
+  clearSellPopUp: (id: number) => void;
   notifyPointerBounce: () => void;
   claimQuestReward: (questIndex: number) => void;
   updateQuestProgress: (
@@ -221,6 +255,9 @@ let toastIdCounter = 1;
 let floatingCoinIdCounter = 1;
 let strikeIdCounter = 1;
 let recentHarvestKeyCounter = 1;
+let harvestRevealIdCounter = 1;
+let fireworkIdCounter = 1;
+let sellPopUpIdCounter = 1;
 
 function nowMs(): number {
   return Date.now();
@@ -337,6 +374,9 @@ type InitialStateFields = Omit<
   | 'harvestAllReady'
   | 'clearFloatingCoin'
   | 'clearRecentHarvest'
+  | 'clearHarvestReveal'
+  | 'clearFirework'
+  | 'clearSellPopUp'
   | 'notifyPointerBounce'
   | 'claimQuestReward'
   | 'updateQuestProgress'
@@ -450,6 +490,9 @@ function bootstrapInitialState(): InitialStateFields {
     coinPulseKey: 0,
     pointerBounceKey: 0,
     recentHarvest: null,
+    harvestReveal: null,
+    fireworks: [],
+    sellPopUps: [],
   };
 }
 
@@ -807,6 +850,35 @@ export const useGameStore = create<GameState>((set, get) => ({
     };
     achievementStats.catTypesHarvested.add(catId);
 
+    const rarity = CAT_TYPES[catId].rarity;
+    const harvestReveal: HarvestReveal = {
+      id: harvestRevealIdCounter++,
+      catTypeId: catId,
+      rarity,
+      plotIndex,
+      createdAt: nowMs(),
+    };
+    const sellPopUp: SellPopUp = {
+      id: sellPopUpIdCounter++,
+      amount: value,
+      rarity,
+      plotIndex,
+      createdAt: nowMs(),
+    };
+    // Fireworks burst only for legendary/mythic harvests.
+    const fireworks =
+      rarity === 'legendary' || rarity === 'mythic'
+        ? [
+            ...state.fireworks,
+            {
+              id: fireworkIdCounter++,
+              tint:
+                rarity === 'mythic' ? '#f8bbd0' : '#ffe082',
+              createdAt: nowMs(),
+            },
+          ]
+        : state.fireworks;
+
     set({
       coins: newCoins,
       totalEarned: newTotalEarned,
@@ -817,6 +889,9 @@ export const useGameStore = create<GameState>((set, get) => ({
       harvestedCats,
       achievementStats,
       floatingCoins: [...state.floatingCoins, floater],
+      sellPopUps: [...state.sellPopUps, sellPopUp],
+      harvestReveal,
+      fireworks,
       coinPulseKey: state.coinPulseKey + 1,
       recentHarvest: {
         catTypeId: catId,
@@ -973,6 +1048,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     let unlockedTypes = state.unlockedCatTypes;
     let toasts = state.toasts;
 
+    let lotteryFireworks: FireworksBurst[] = [];
     if (prize.kind === 'coins' && prize.coins !== undefined) {
       newCoins += prize.coins;
       totalEarned += prize.coins;
@@ -982,12 +1058,44 @@ export const useGameStore = create<GameState>((set, get) => ({
         `Vinst: ${prize.coins} mynt!`,
         'Tack för att du snurrade',
       );
+      // Big-coin wins (>= 500) get fireworks.
+      if (prize.coins >= 500) {
+        lotteryFireworks = [
+          {
+            id: fireworkIdCounter++,
+            tint: '#ffd56b',
+            createdAt: nowMs(),
+          },
+        ];
+      }
     } else if (prize.kind === 'seed' && prize.seedId) {
       newInv[prize.seedId] = (newInv[prize.seedId] ?? 0) + 1;
       if (!unlockedTypes.includes(prize.seedId)) {
         unlockedTypes = [...unlockedTypes, prize.seedId];
       }
       toasts = pushToast(toasts, 'success', `Vinst: ${prize.label}!`);
+      // Rare seed wins (rare+ rarity) get fireworks.
+      const seedRarity = CAT_TYPES[prize.seedId]?.rarity;
+      if (
+        seedRarity === 'rare' ||
+        seedRarity === 'epic' ||
+        seedRarity === 'legendary' ||
+        seedRarity === 'mythic'
+      ) {
+        const tintByRarity: Record<string, string> = {
+          rare: '#d1c4e9',
+          epic: '#ffccbc',
+          legendary: '#ffe082',
+          mythic: '#f8bbd0',
+        };
+        lotteryFireworks = [
+          {
+            id: fireworkIdCounter++,
+            tint: tintByRarity[seedRarity] ?? '#ffd56b',
+            createdAt: nowMs(),
+          },
+        ];
+      }
     }
 
     const unlockedPlotIndices = plotsUnlockedBy(state.totalEarned, totalEarned);
@@ -1034,6 +1142,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       coinPulseKey:
         prize.kind === 'coins' ? state.coinPulseKey + 1 : state.coinPulseKey,
       achievementStats,
+      fireworks: [...state.fireworks, ...lotteryFireworks],
     });
 
     get().updateQuestProgress('spin_lottery', 1);
@@ -1087,6 +1196,16 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
 
   clearRecentHarvest: () => set({ recentHarvest: null }),
+
+  clearHarvestReveal: () => set({ harvestReveal: null }),
+
+  clearFirework: (id) => {
+    set({ fireworks: get().fireworks.filter((f) => f.id !== id) });
+  },
+
+  clearSellPopUp: (id) => {
+    set({ sellPopUps: get().sellPopUps.filter((p) => p.id !== id) });
+  },
 
   updateQuestProgress: (type, amount, meta) => {
     const state = get();
@@ -1195,12 +1314,19 @@ function checkAchievementsInline(
   const state = get();
   const result = processAchievementUnlocks(state);
   if (result.newlyUnlockedIds.length === 0) return;
+  // One fireworks burst per newly-unlocked achievement (max 3 stacked).
+  const newFireworks = result.newlyUnlockedIds.slice(0, 3).map((_, i) => ({
+    id: fireworkIdCounter++,
+    tint: i === 0 ? '#ffd56b' : i === 1 ? '#ff8fa3' : '#a8c5ff',
+    createdAt: nowMs(),
+  }));
   set({
     coins: result.coins,
     seedInventory: result.seedInventory,
     toasts: result.toasts,
     unlockedAchievements: result.unlockedAchievements,
     totalEarned: state.totalEarned + result.totalEarnedDelta,
+    fireworks: [...state.fireworks, ...newFireworks],
     coinPulseKey:
       result.totalEarnedDelta > 0 ? state.coinPulseKey + 1 : state.coinPulseKey,
   });

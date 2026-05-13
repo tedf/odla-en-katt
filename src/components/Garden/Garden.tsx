@@ -1,16 +1,21 @@
 /**
- * Garden — 6-plot grid. Each plot is a PlotCard with depth/lip styling.
+ * Garden — 6-plot grid with ambient atmosphere (butterflies, leaves,
+ * sparkles) and a "next plot unlocks at" progress bar on desktop.
  */
 
 import { useEffect, useState } from 'react';
 import { useGameStore } from '../../store/useGameStore';
 import { useSoundEffects } from '../../hooks/useSoundEffects';
 import { activeMultiplier } from '../../domain/upgrades';
+import { nextPlotUnlock } from '../../domain/economy';
+import { formatCoins } from '../../domain/time';
 import { PlotCard } from './PlotCard';
+import { AmbientGarden } from '../effects/AmbientGarden';
 import './garden.css';
 
 export function Garden() {
   const plots = useGameStore((s) => s.plots);
+  const totalEarned = useGameStore((s) => s.totalEarned);
   const activeSpeedUpgrade = useGameStore((s) => s.activeSpeedUpgrade);
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
@@ -21,9 +26,11 @@ export function Garden() {
   const speedMult = activeMultiplier(activeSpeedUpgrade, now);
   const readyCount = plots.filter((p) => p.state === 'ready').length;
   const { playHarvest } = useSoundEffects();
+  const upcoming = nextPlotUnlock(totalEarned);
 
   return (
     <section className="section-card garden-section" aria-label="Trädgården">
+      <AmbientGarden />
       <header className="garden-header">
         <h2>
           <LeafIcon /> Trädgården
@@ -51,6 +58,27 @@ export function Garden() {
           <PlotCard key={plot.index} plot={plot} />
         ))}
       </div>
+
+      {upcoming !== null && (
+        <div className="garden-unlock-progress" aria-live="polite">
+          <div className="garden-unlock-row">
+            <span className="garden-unlock-label">
+              Nästa odlingsyta öppnas vid
+            </span>
+            <span className="garden-unlock-value num">
+              {formatCoins(upcoming.threshold)} mynt
+            </span>
+          </div>
+          <progress
+            className="garden-unlock-bar"
+            value={Math.min(totalEarned, upcoming.threshold)}
+            max={upcoming.threshold}
+          />
+          <span className="garden-unlock-now num">
+            {formatCoins(totalEarned)} / {formatCoins(upcoming.threshold)}
+          </span>
+        </div>
+      )}
     </section>
   );
 }
