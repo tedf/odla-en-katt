@@ -25,6 +25,8 @@ describe('growthProgress', () => {
         catType: null,
         plantedAt: null,
         lightningBonus: 0,
+        weatherEvents: [],
+        weatherBonusBreakdown: {},
       },
       'graskatt',
       0,
@@ -57,6 +59,8 @@ describe('isMature', () => {
         catType: null,
         plantedAt: null,
         lightningBonus: 0,
+        weatherEvents: [],
+        weatherBonusBreakdown: {},
       },
       'graskatt',
       0,
@@ -67,13 +71,19 @@ describe('isMature', () => {
 });
 
 describe('plot unlocks', () => {
-  it('matches spec thresholds', () => {
+  it('matches spec thresholds for 12 plots', () => {
     expect(plotUnlockThreshold(0)).toBe(0);
     expect(plotUnlockThreshold(1)).toBe(200);
     expect(plotUnlockThreshold(2)).toBe(800);
     expect(plotUnlockThreshold(3)).toBe(3000);
     expect(plotUnlockThreshold(4)).toBe(10000);
     expect(plotUnlockThreshold(5)).toBe(50000);
+    expect(plotUnlockThreshold(6)).toBe(150000);
+    expect(plotUnlockThreshold(7)).toBe(400000);
+    expect(plotUnlockThreshold(8)).toBe(1000000);
+    expect(plotUnlockThreshold(9)).toBe(3000000);
+    expect(plotUnlockThreshold(10)).toBe(8000000);
+    expect(plotUnlockThreshold(11)).toBe(20000000);
   });
 
   it('reports unlock when threshold is hit', () => {
@@ -85,6 +95,7 @@ describe('plot unlocks', () => {
     expect(plotsUnlockedBy(0, 200)).toEqual([1]);
     expect(plotsUnlockedBy(199, 3000)).toEqual([1, 2, 3]);
     expect(plotsUnlockedBy(3000, 4000)).toEqual([]);
+    expect(plotsUnlockedBy(50000, 150000)).toEqual([6]);
   });
 });
 
@@ -96,13 +107,17 @@ describe('lightning bonus', () => {
     catType: 'graskatt' as const,
     plantedAt: 0,
     lightningBonus: 0,
+    weatherEvents: [] as string[],
+    weatherBonusBreakdown: {} as Record<string, number>,
   };
 
-  it('caps at +100%', () => {
+  it('caps lightning at +100% per-event', () => {
     let plot = applyLightningBonus(base, 0.5);
     plot = applyLightningBonus(plot, 0.4);
     plot = applyLightningBonus(plot, 0.4);
     expect(plot.lightningBonus).toBe(1);
+    expect(plot.weatherEvents).toEqual(['lightning']);
+    expect(plot.weatherBonusBreakdown.lightning).toBe(1);
   });
 
   it('applies multiplier on sell value', () => {

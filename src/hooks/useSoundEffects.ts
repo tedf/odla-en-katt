@@ -118,6 +118,13 @@ export interface UseSoundEffectsApi {
   playCoinEarn: () => void;
   playPlant: () => void;
   playLightning: () => void;
+  playTornado: () => void;
+  playIce: () => void;
+  playRain: () => void;
+  playSnow: () => void;
+  playMeteor: () => void;
+  /** Dispatch a sound for any weather event id. */
+  playWeather: (eventId: string) => void;
   playLotteryWin: (rare?: boolean) => void;
   playLotterySpin: () => void;
   playBuyUpgrade: () => void;
@@ -360,11 +367,145 @@ export function useSoundEffects(): UseSoundEffectsApi {
     );
   });
 
+  // ---- New weather sounds (per feature 3 spec) ----
+
+  const playTornado = guarded((ctx) => {
+    // Low rumbling sweep down.
+    playNote(
+      ctx,
+      {
+        freq: 240,
+        durationMs: 900,
+        type: 'sawtooth',
+        gain: 0.22,
+        attack: 0.05,
+        release: 0.7,
+        freqEnd: 60,
+      },
+      MASTER,
+    );
+    playNoise(ctx, 600, 0.18, MASTER);
+  });
+
+  const playIce = guarded((ctx) => {
+    // High crystalline ping.
+    playNote(
+      ctx,
+      {
+        freq: 2100,
+        durationMs: 200,
+        type: 'triangle',
+        gain: 0.18,
+        attack: 0.02,
+        release: 0.8,
+        freqEnd: 1800,
+      },
+      MASTER,
+    );
+    playNote(
+      ctx,
+      {
+        freq: 3200,
+        durationMs: 280,
+        type: 'sine',
+        gain: 0.12,
+        startDelay: 60,
+        attack: 0.05,
+        release: 0.8,
+      },
+      MASTER,
+    );
+  });
+
+  const playRain = guarded((ctx) => {
+    // Soft white noise burst.
+    playNoise(ctx, 700, 0.18, MASTER);
+  });
+
+  const playSnow = guarded((ctx) => {
+    // Gentle bell.
+    [880, 1175, 1568].forEach((freq, i) => {
+      playNote(
+        ctx,
+        {
+          freq,
+          durationMs: 300,
+          type: 'sine',
+          gain: 0.16,
+          startDelay: i * 80,
+          attack: 0.05,
+          release: 0.85,
+        },
+        MASTER,
+      );
+    });
+  });
+
+  const playMeteor = guarded((ctx) => {
+    // Deep impact + ascending pitch sweep.
+    playNoise(ctx, 520, 0.4, MASTER);
+    playNote(
+      ctx,
+      {
+        freq: 60,
+        durationMs: 320,
+        type: 'sawtooth',
+        gain: 0.32,
+        attack: 0.02,
+        release: 0.7,
+        freqEnd: 30,
+      },
+      MASTER,
+    );
+    playNote(
+      ctx,
+      {
+        freq: 180,
+        durationMs: 900,
+        type: 'triangle',
+        gain: 0.22,
+        startDelay: 220,
+        attack: 0.05,
+        release: 0.6,
+        freqEnd: 880,
+      },
+      MASTER,
+    );
+  });
+
+  const playWeather = useCallback(
+    (eventId: string) => {
+      switch (eventId) {
+        case 'lightning':
+          return playLightning();
+        case 'tornado':
+          return playTornado();
+        case 'ice':
+          return playIce();
+        case 'rain':
+          return playRain();
+        case 'snow':
+          return playSnow();
+        case 'meteor':
+          return playMeteor();
+        default:
+          return;
+      }
+    },
+    [playLightning, playTornado, playIce, playRain, playSnow, playMeteor],
+  );
+
   return {
     playHarvest,
     playCoinEarn,
     playPlant,
     playLightning,
+    playTornado,
+    playIce,
+    playRain,
+    playSnow,
+    playMeteor,
+    playWeather,
     playLotteryWin,
     playLotterySpin,
     playBuyUpgrade,

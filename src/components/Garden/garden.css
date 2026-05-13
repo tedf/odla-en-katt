@@ -51,7 +51,7 @@
 
 .garden-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
   gap: var(--space-sm);
 }
 
@@ -65,6 +65,12 @@
 @media (min-width: 600px) {
   .garden-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1200px) {
+  .garden-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
 
@@ -485,6 +491,210 @@
 
 .plot-storm-cloud.active {
   animation: storm-shake 0.5s ease-in-out 3;
+}
+
+/* ---- Weather event badges ---- */
+.plot-weather-badges {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  z-index: 3;
+  pointer-events: none;
+  max-width: 60%;
+}
+
+.plot-weather-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px 4px;
+  border-radius: var(--radius-pill);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.7rem;
+  letter-spacing: 0.01em;
+  color: var(--weather-fg, #fff);
+  background: var(--weather-bg, #1f2937);
+  box-shadow:
+    0 2px 0 rgba(0, 0, 0, 0.18),
+    0 4px 12px -4px rgba(0, 0, 0, 0.25);
+  border: 1.5px solid var(--weather-fg, transparent);
+}
+
+.plot-weather-badge .badge-emoji {
+  font-size: 0.85rem;
+  filter: drop-shadow(0 1px 0 rgba(0, 0, 0, 0.35));
+}
+
+/* ---- Active weather strike overlays (single-plot animations) ---- */
+.plot-card.fx-active {
+  animation: plot-strike-pulse 1.4s ease-in-out;
+}
+
+@keyframes plot-strike-pulse {
+  0% {
+    transform: translateY(0) scale(1);
+  }
+  20% {
+    transform: translateY(-2px) scale(1.02);
+  }
+  100% {
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Lightning: yellow electric border */
+.plot-card.fx-lightning .plot-inner {
+  box-shadow: 0 0 0 3px rgba(252, 211, 77, 0.85), 0 0 22px rgba(252, 211, 77, 0.55);
+  border-radius: 18px;
+}
+
+/* Tornado: spinning aura */
+.plot-card.fx-tornado .fx-cat-target {
+  animation: tornado-spin 1.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes tornado-spin {
+  0% {
+    transform: rotate(0) scale(0.95);
+  }
+  60% {
+    transform: rotate(720deg) scale(1.05);
+  }
+  100% {
+    transform: rotate(720deg) scale(1);
+  }
+}
+
+/* Ice: cold shimmer */
+.plot-card.fx-ice .plot-inner {
+  box-shadow: 0 0 0 3px rgba(186, 230, 253, 0.9), 0 0 28px rgba(125, 211, 252, 0.55);
+  border-radius: 18px;
+}
+
+.plot-card.fx-ice::before {
+  background: radial-gradient(
+    100% 90% at 50% 15%,
+    rgba(255, 255, 255, 0.55),
+    rgba(186, 230, 253, 0.25) 60%,
+    rgba(0, 0, 0, 0) 100%
+  );
+}
+
+/* Rain: green-blue glow */
+.plot-card.fx-rain .plot-inner {
+  box-shadow: 0 0 0 3px rgba(110, 231, 183, 0.75), 0 0 22px rgba(6, 95, 70, 0.45);
+  border-radius: 18px;
+}
+
+/* Snow: pale glow */
+.plot-card.fx-snow .plot-inner {
+  box-shadow: 0 0 0 3px rgba(224, 242, 254, 0.85), 0 0 22px rgba(186, 230, 253, 0.45);
+  border-radius: 18px;
+}
+
+/* Meteor: intense orange-red */
+.plot-card.fx-meteor .plot-inner {
+  box-shadow:
+    0 0 0 4px rgba(254, 215, 170, 0.85),
+    0 0 36px rgba(220, 38, 38, 0.7);
+  border-radius: 18px;
+}
+
+.plot-card.fx-meteor {
+  animation: meteor-impact 1.4s ease-out;
+}
+
+@keyframes meteor-impact {
+  0% {
+    transform: translateY(-4px) scale(1.04);
+    filter: brightness(1.4);
+  }
+  20% {
+    transform: translateY(2px) scale(0.98);
+  }
+  40% {
+    transform: translateY(0) scale(1);
+  }
+  100% {
+    transform: translateY(0) scale(1);
+    filter: brightness(1);
+  }
+}
+
+/* Weather emoji burst above plot */
+.plot-weather-burst {
+  position: absolute;
+  inset: auto 0 auto 0;
+  top: -18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 5;
+  font-size: 2.2rem;
+  animation: weather-burst 1.6s ease-out forwards;
+}
+
+@keyframes weather-burst {
+  0% {
+    opacity: 0;
+    transform: scale(0.3) translateY(8px);
+  }
+  20% {
+    opacity: 1;
+    transform: scale(1.2) translateY(-2px);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1) translateY(-24px);
+  }
+}
+
+/* Snow sparkle particles (reuse for burst). */
+.plot-weather-particles {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 4;
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+}
+
+.plot-weather-particles span {
+  position: absolute;
+  border-radius: 50%;
+  opacity: 0.95;
+  background: currentColor;
+  animation: particle-fall 1.4s linear forwards;
+}
+
+@keyframes particle-fall {
+  0% {
+    transform: translateY(-30%) scale(0.6);
+    opacity: 0;
+  }
+  20% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(110%) scale(1);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .plot-card.fx-active,
+  .plot-card.fx-meteor,
+  .plot-card.fx-tornado .fx-cat-target,
+  .plot-weather-burst,
+  .plot-weather-particles span {
+    animation: none;
+  }
 }
 
 /* ---- Plant sheet (modal) ---- */

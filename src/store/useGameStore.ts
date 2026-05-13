@@ -8,20 +8,20 @@
 import { create } from 'zustand';
 import { CAT_TYPES, type CatTypeId } from '../domain/catTypes';
 import {
-  applyLightningBonus,
+  applyWeatherBonus,
   effectiveSellValue,
   emptyPlotAfterHarvest,
   isMature,
   markReady,
   plantInPlot,
+  PLOT_UNLOCK_THRESHOLDS,
   type PlotState,
 } from '../domain/plots';
 import {
-  isLightningOffCooldown,
-  rollLightningBonus,
-  rollLightningTrigger,
-  LIGHTNING_BASE_CHANCE_PER_SEC,
-} from '../domain/lightning';
+  rollAnyWeatherEvent,
+  rollWeatherBonus,
+  type WeatherEvent,
+} from '../domain/events';
 import {
   isFreeSpinAvailable,
   localDateString,
@@ -75,6 +75,16 @@ interface FloatingCoin {
   plotIndex: number | null;
 }
 
+export interface ActiveWeatherStrike {
+  /** Ephemeral monotonic id used as React key for re-trigger animations. */
+  id: number;
+  plotIndex: number;
+  eventId: string;
+  bonus: number;
+  /** Epoch ms when the strike was applied. */
+  triggeredAt: number;
+}
+
 export interface GameState {
   // ---- save fields ----
   coins: number;
@@ -84,6 +94,8 @@ export interface GameState {
   unlockedCatTypes: CatTypeId[];
   catsSoldByType: Record<CatTypeId, number>;
   lastStormAt: number | null;
+  /** Per-weather-event last-fire timestamps. Used by tick() rolls. */
+  weatherCooldowns: Record<string, number | null>;
   lottery: {
     lastFreeSpinAt: number | null;
     spinsToday: number;
@@ -100,7 +112,10 @@ export interface GameState {
   toasts: ToastMessage[];
   floatingCoins: FloatingCoin[];
   pendingRecap: PendingRecap | null;
+  /** @deprecated Kept for any consumer still reading the old field. */
   activeStormPlot: number | null;
+  /** Currently-animating strike, if any. */
+  activeStrike: ActiveWeatherStrike | null;
   lastSpin: SpinResult | null;
   /** Bumps whenever a lottery spin starts (useful for sound triggers). */
   lotterySpinKey: number;
@@ -130,10 +145,12 @@ export interface GameState {
 
 const TOAST_DEFAULT_TTL = 3500;
 const AWAY_RECAP_THRESHOLD_MS = 60_000;
-const PLOT_THRESHOLDS = [0, 200, 800, 3000, 10000, 50000];
+/** Active strike animation lifetime before activeStrike auto-clears. */
+const STRIKE_DISPLAY_MS = 1800;
 
 let toastIdCounter = 1;
 let floatingCoinIdCounter = 1;
+let strikeIdCounter = 1;
 
 function nowMs(): number {
   return Date.now();
@@ -168,6 +185,7 @@ function persistFromState(state: GameState): void {
     unlockedCatTypes: state.unlockedCatTypes,
     catsSoldByType: state.catsSoldByType,
     lastStormAt: state.lastStormAt,
+    weatherCooldowns: state.weatherCooldowns,
     lottery: state.lottery,
     settings: state.settings,
     purchasedUpgrades: state.purchasedUpgrades,
@@ -205,7 +223,8 @@ function bootstrapInitialState(): InitialStateFields {
 
   // Sync unlocked plots with totalEarned (recompute defensively).
   const unlockedPlots = save.plots.map((p) => {
-    const threshold = PLOT_THRESHOLDS[p.index] ?? Number.MAX_SAFE_INTEGER;
+    const threshold =
+      PLOT_UNLOCK_THRESHOLDS[p.index] ?? Number.MAX_SAFE_INTEGER;
     return { ...p, unlocked: save.totalEarned >= threshold };
   });
 
@@ -232,6 +251,7 @@ function bootstrapInitialState(): InitialStateFields {
     unlockedCatTypes: save.unlockedCatTypes,
     catsSoldByType: save.catsSoldByType,
     lastStormAt: save.lastStormAt,
+    weatherCooldowns: save.weatherCooldowns ?? {},
     lottery: save.lottery,
     settings: save.settings,
     purchasedUpgrades: save.purchasedUpgrades,
@@ -240,6 +260,7 @@ function bootstrapInitialState(): InitialStateFields {
     floatingCoins: [],
     pendingRecap,
     activeStormPlot: null,
+    activeStrike: null,
     lastSpin: null,
     lotterySpinKey: 0,
     lotteryResultKey: 0,
@@ -257,8 +278,10 @@ export const useGameStore = create<GameState>((set, get) => ({
     const speedMult = activeSpeedMultiplier(state.purchasedUpgrades);
 
     let plots = state.plots;
-    let lastStormAt = state.lastStormAt;
+    let weatherCooldowns: Record<string, number | null> = state.weatherCooldowns;
     let activeStormPlot: number | null = state.activeStormPlot;
+    let activeStrike: ActiveWeatherStrike | null = state.activeStrike;
+    let lastStormAt = state.lastStormAt;
     let toasts = state.toasts;
     let changed = false;
 
@@ -271,38 +294,62 @@ export const useGameStore = create<GameState>((set, get) => ({
       return p;
     });
 
-    // 2. Lightning roll, respecting global cooldown.
-    if (isLightningOffCooldown(lastStormAt, now)) {
-      const growingIndices = plots
-        .map((p, i) => (p.state === 'growing' ? i : -1))
-        .filter((i) => i >= 0);
+    // 2. Roll weather events. We bias rarer events first via rollAnyWeatherEvent
+    // so a lucky tick favors the bigger spectacle. One event per tick max.
+    const growingIndices = plots
+      .map((p, i) => (p.state === 'growing' ? i : -1))
+      .filter((i) => i >= 0);
 
-      for (const idx of growingIndices) {
-        if (rollLightningTrigger(LIGHTNING_BASE_CHANCE_PER_SEC)) {
-          const bonus = rollLightningBonus();
-          const plot = plots[idx];
-          if (!plot) continue;
+    if (growingIndices.length > 0) {
+      const event: WeatherEvent | null = rollAnyWeatherEvent(
+        weatherCooldowns,
+        now,
+      );
+      if (event) {
+        // Pick a random growing plot for the event to strike.
+        const pickIdx =
+          growingIndices[Math.floor(Math.random() * growingIndices.length)] ??
+          growingIndices[0];
+        if (typeof pickIdx === 'number') {
+          const bonus = rollWeatherBonus(event);
+          const perEventCap = event.canExceed100
+            ? Number.POSITIVE_INFINITY
+            : 1.0;
           plots = plots.map((p, i) =>
-            i === idx ? applyLightningBonus(p, bonus) : p,
+            i === pickIdx
+              ? applyWeatherBonus(p, event.id, bonus, perEventCap)
+              : p,
           );
-          lastStormAt = now;
-          activeStormPlot = idx;
+          weatherCooldowns = { ...weatherCooldowns, [event.id]: now };
+          if (event.id === 'lightning') {
+            lastStormAt = now;
+            activeStormPlot = pickIdx;
+          }
+          activeStrike = {
+            id: strikeIdCounter++,
+            plotIndex: pickIdx,
+            eventId: event.id,
+            bonus,
+            triggeredAt: now,
+          };
           const bonusPct = Math.round(bonus * 100);
           toasts = pushToast(
             toasts,
             'lightning',
-            'Blixtbonus!',
-            `Plot ${idx + 1} fick +${bonusPct}% värde`,
+            `${event.emoji} ${event.name}!`,
+            `Plot ${pickIdx + 1} fick +${bonusPct}% värde`,
           );
           changed = true;
-          break; // only one storm per tick
         }
       }
     }
 
-    // Auto-clear active storm visualization after a moment.
+    // Auto-clear active strike after STRIKE_DISPLAY_MS so animations finish.
+    if (activeStrike && now - activeStrike.triggeredAt > STRIKE_DISPLAY_MS) {
+      activeStrike = null;
+    }
     if (activeStormPlot !== null && lastStormAt !== null) {
-      if (now - lastStormAt > 1500) {
+      if (now - lastStormAt > STRIKE_DISPLAY_MS) {
         activeStormPlot = null;
       }
     }
@@ -313,7 +360,9 @@ export const useGameStore = create<GameState>((set, get) => ({
     set({
       plots,
       lastStormAt,
+      weatherCooldowns,
       activeStormPlot,
+      activeStrike,
       toasts,
       lastTickAt: now,
     });

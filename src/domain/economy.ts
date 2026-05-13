@@ -25,7 +25,7 @@ export function tryPurchase(
   return { ok: true };
 }
 
-/** Returns plot indices [0..5] that just unlocked given old and new totals. */
+/** Returns plot indices that just unlocked given old and new totals. */
 export function plotsUnlockedBy(oldTotal: number, newTotal: number): number[] {
   const out: number[] = [];
   for (let i = 0; i < MAX_PLOTS; i++) {

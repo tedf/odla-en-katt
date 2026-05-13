@@ -132,21 +132,21 @@ function App() {
  * place owns "what does X event sound like".
  */
 function useGlobalSoundEffects(): void {
-  const { playLightning, playUnlockPlot, playCoinEarn } = useSoundEffects();
-  const stormPlot = useGameStore((s) => s.activeStormPlot);
+  const { playWeather, playUnlockPlot, playCoinEarn } = useSoundEffects();
+  const activeStrike = useGameStore((s) => s.activeStrike);
   const coinPulseKey = useGameStore((s) => s.coinPulseKey);
   const unlockedTypes = useGameStore((s) => s.unlockedCatTypes);
 
-  const lastStormRef = useRef<number | null>(null);
+  const lastStrikeRef = useRef<number | null>(null);
   const lastCoinKeyRef = useRef<number>(coinPulseKey);
   const lastUnlockCountRef = useRef<number>(unlockedTypes.length);
 
   useEffect(() => {
-    if (stormPlot !== null && stormPlot !== lastStormRef.current) {
-      playLightning();
+    if (activeStrike && activeStrike.id !== lastStrikeRef.current) {
+      playWeather(activeStrike.eventId);
+      lastStrikeRef.current = activeStrike.id;
     }
-    lastStormRef.current = stormPlot;
-  }, [stormPlot, playLightning]);
+  }, [activeStrike, playWeather]);
 
   useEffect(() => {
     if (coinPulseKey !== lastCoinKeyRef.current && coinPulseKey > 0) {

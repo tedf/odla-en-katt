@@ -209,6 +209,21 @@ function renderCatBadge(catType: CatTypeId, accent: string, glow: string) {
           />
         </g>
       );
+    case 'bamboukatt':
+      return (
+        <g>
+          {/* Distinct dark panda eye patches over the eyes. */}
+          <ellipse cx="48" cy="50" rx="9" ry="9" fill="#222428" opacity="0.85" />
+          <ellipse cx="72" cy="50" rx="9" ry="9" fill="#222428" opacity="0.85" />
+          {/* Bamboo stalk on belly. */}
+          <rect x="56" y="74" width="8" height="14" rx="2" fill="#4ADE80" />
+          <line x1="56" y1="80" x2="64" y2="80" stroke="#1B5C2D" strokeWidth="1.2" />
+          <line x1="56" y1="84" x2="64" y2="84" stroke="#1B5C2D" strokeWidth="1.2" />
+          {/* Two tiny bamboo leaves. */}
+          <path d="M 64 74 Q 72 70 70 78" fill="#86EFAC" />
+          <path d="M 56 74 Q 48 70 50 78" fill="#86EFAC" />
+        </g>
+      );
     case 'blabarskatt':
       return (
         <g>
@@ -232,6 +247,20 @@ function renderCatBadge(catType: CatTypeId, accent: string, glow: string) {
           ))}
         </g>
       );
+    case 'kokosnotkatt':
+      return (
+        <g>
+          {/* Coconut shell pattern: dark fibrous oval on body. */}
+          <ellipse cx="60" cy="80" rx="12" ry="8" fill="#3D2A0F" opacity="0.55" />
+          <line x1="50" y1="80" x2="70" y2="80" stroke="#1F1208" strokeWidth="0.8" />
+          <line x1="55" y1="74" x2="65" y2="86" stroke="#1F1208" strokeWidth="0.6" />
+          <line x1="65" y1="74" x2="55" y2="86" stroke="#1F1208" strokeWidth="0.6" />
+          {/* Palm leaf tuft above forehead. */}
+          <path d="M 60 16 Q 52 8 46 14 Q 54 16 56 22 Z" fill="#65A30D" />
+          <path d="M 60 16 Q 68 8 74 14 Q 66 16 64 22 Z" fill="#65A30D" />
+          <path d="M 60 14 Q 60 6 60 4" stroke="#3F6E0D" strokeWidth="2" strokeLinecap="round" />
+        </g>
+      );
     case 'citruskatt':
       return (
         <g>
@@ -243,6 +272,58 @@ function renderCatBadge(catType: CatTypeId, accent: string, glow: string) {
             strokeLinecap="round"
           />
           <circle cx="60" cy="84" r="3" fill={accent} />
+        </g>
+      );
+    case 'isbjornkatt':
+      return (
+        <g>
+          {/* Snow flecks on body. */}
+          {[
+            [44, 74],
+            [56, 80],
+            [72, 76],
+            [80, 84],
+            [52, 88],
+            [68, 86],
+          ].map(([x, y], i) => (
+            <g key={i} transform={`translate(${x} ${y})`}>
+              <path
+                d="M 0 -3 L 0 3 M -3 0 L 3 0 M -2 -2 L 2 2 M -2 2 L 2 -2"
+                stroke="#93C5FD"
+                strokeWidth="0.9"
+                strokeLinecap="round"
+              />
+            </g>
+          ))}
+          {/* Tiny iceberg crown */}
+          <path d="M 50 14 L 60 4 L 70 14 Z" fill="#DCEDFF" opacity="0.85" />
+          <path d="M 54 14 L 60 8 L 66 14 Z" fill="#93C5FD" opacity="0.7" />
+        </g>
+      );
+    case 'vulkankatt':
+      return (
+        <g>
+          {/* Lava cracks across the body. */}
+          <path
+            d="M 38 76 Q 50 70 60 76 Q 72 82 84 74"
+            stroke="#FF8E3C"
+            strokeWidth="2"
+            fill="none"
+            strokeLinecap="round"
+          />
+          <path
+            d="M 42 88 Q 52 82 64 88 Q 74 92 80 84"
+            stroke="#FF3D00"
+            strokeWidth="1.5"
+            fill="none"
+            strokeLinecap="round"
+            opacity="0.85"
+          />
+          {/* Ember sparks above head. */}
+          <circle cx="46" cy="10" r="2" fill="#FFB97A" />
+          <circle cx="60" cy="6" r="2.5" fill="#FF8E3C" />
+          <circle cx="74" cy="10" r="2" fill="#FFB97A" />
+          <path d="M 60 8 L 60 16" stroke="#FF3D00" strokeWidth="1.5" />
         </g>
       );
     case 'regnbagskatt':
@@ -264,6 +345,36 @@ function renderCatBadge(catType: CatTypeId, accent: string, glow: string) {
           />
         </g>
       );
+    case 'drakkatt':
+      return (
+        <g>
+          {/* Wing on the back. */}
+          <path
+            d="M 88 36 Q 108 26 110 12 Q 96 18 90 30"
+            fill="#7C3AED"
+            stroke="#3B0B5A"
+            strokeWidth="1.2"
+          />
+          <path
+            d="M 90 30 L 100 20 M 92 34 L 104 26"
+            stroke="#3B0B5A"
+            strokeWidth="0.8"
+          />
+          {/* Spiky dorsal fin on the head ridge. */}
+          <path
+            d="M 50 14 L 54 6 L 58 14 L 62 4 L 66 14 L 70 6 L 74 14"
+            fill="#FFB300"
+            stroke="#3B0B5A"
+            strokeWidth="0.8"
+            strokeLinejoin="round"
+          />
+          {/* Tiny fang. */}
+          <path d="M 56 64 L 58 70 L 60 64 Z" fill="white" />
+          <path d="M 60 64 L 62 70 L 64 64 Z" fill="white" />
+          {/* Ember puff from mouth */}
+          <circle cx="60" cy="76" r="2" fill="#FFB300" opacity="0.85" />
+        </g>
+      );
     case 'stjarnkatt':
       return (
         <g>
@@ -283,6 +394,32 @@ function renderCatBadge(catType: CatTypeId, accent: string, glow: string) {
           <line x1="62" y1="62" x2="72" y2="72" stroke="#FFE082" strokeWidth="0.6" opacity="0.5" />
           <line x1="72" y1="72" x2="80" y2="64" stroke="#FFE082" strokeWidth="0.6" opacity="0.5" />
           <ellipse cx="60" cy="14" rx="20" ry="3" fill="none" stroke="#FFE082" strokeWidth="1.2" opacity="0.8" />
+        </g>
+      );
+    case 'enhornigskatt':
+      return (
+        <g>
+          {/* Spiral unicorn horn between the ears. */}
+          <path
+            d="M 60 16 L 56 2"
+            stroke="#FFD700"
+            strokeWidth="3"
+            strokeLinecap="round"
+          />
+          <path
+            d="M 60 14 L 58 8 M 60 10 L 57 5"
+            stroke="#B45309"
+            strokeWidth="0.8"
+            strokeLinecap="round"
+          />
+          {/* Pastel rainbow mane along the back. */}
+          <path d="M 36 32 Q 38 22 46 24" stroke="#F472B6" strokeWidth="2.5" fill="none" strokeLinecap="round" />
+          <path d="M 40 36 Q 44 28 52 30" stroke="#FBBF24" strokeWidth="2.5" fill="none" strokeLinecap="round" />
+          <path d="M 44 40 Q 50 32 58 34" stroke="#34D399" strokeWidth="2.5" fill="none" strokeLinecap="round" />
+          {/* Tiny sparkles. */}
+          <circle cx="86" cy="30" r="1.6" fill="#EC4899" />
+          <circle cx="92" cy="44" r="1.2" fill="#A78BFA" />
+          <circle cx="34" cy="56" r="1.4" fill="#FBBF24" />
         </g>
       );
     case 'rymkatt':

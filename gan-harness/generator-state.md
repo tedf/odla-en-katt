@@ -1,93 +1,131 @@
-# Generator State — Iteration 002
+# Generator State — Iteration 003
 
-## What Was Built (incremental on iteration 001)
+## What Was Built (incremental on iteration 002)
 
-### New domain modules
-- `src/domain/upgrades.ts` — `SPEED_UPGRADES` const (4 tiers: Gödselvatten 1.5x/100, Magisk Jord 2x/500, Trollformelsfrö 3x/2000, Tidsmagi 5x/10000), `activeSpeedMultiplier(purchasedIds[])` returning the highest tier multiplier (non-stacking), `nextAvailableUpgrade`, and `getUpgradeById`.
-- `src/domain/__tests__/upgrades.test.ts` — 8 unit tests (cost/multiplier monotonicity, activeSpeedMultiplier semantics, next-tier discovery, unknown-id safety).
+### Feature 1 — 6 new cat types (8 → 14)
 
-### New hook
-- `src/hooks/useSoundEffects.ts` — Web Audio API based synth. No audio files. Exposes `playHarvest` (C5→E5→G5 arpeggio), `playCoinEarn` (880Hz blip + 1320Hz tail), `playPlant` (200→120Hz dip), `playLightning` (noise burst + sawtooth dive), `playLotteryWin(rare?)` (3-note for common, 5-note + sparkle tail for rare), `playLotterySpin` (sawtooth 200→800Hz over 4s), `playBuyUpgrade` (C5→E5 squares), `playUnlockPlot` (4-note triangle ascent), `playButton`. Reads `settings.soundMuted` from store to gate playback. AudioContext is lazy + shared.
+Added in canonical progression order in `src/domain/catTypes.ts`:
 
-### New UI components
-- `src/components/effects/FloatingCoins.tsx` — consumes the `floatingCoins` store queue and renders "+N mynt" pills floating up with framer-motion `AnimatePresence`. Auto-clears via `onAnimationComplete`. Horizontal offset varies per plotIndex so multi-harvest pills don't overlap.
+- `bamboukatt` — common, 25m grow, 90 coin sell, panda-coloured cat with bamboo stalk on belly + jade-green leaves above ears. Unlocks at 70 totalEarned.
+- `kokosnotkatt` — uncommon, 45m grow, 350 coin sell, sand-coloured with dark coconut shell pattern on belly and a palm-leaf tuft above the forehead. Unlocks at 900 totalEarned.
+- `isbjornkatt` — rare, 75m grow, 580 coin sell, white-bodied with arctic snowflake speckles and a tiny iceberg crown. Unlocks at 2200 totalEarned.
+- `vulkankatt` — rare, 90m grow, 700 coin sell, dark obsidian body with glowing lava cracks across the belly and embers floating above the head. Unlocks at 2800 totalEarned.
+- `drakkatt` — epic, 2h grow, 2500 coin sell, dragon-cat with a violet folded wing, golden saw-tooth spinal fin between the ears, and tiny fangs + ember puff. Unlocks at 6000 totalEarned.
+- `enhornigskatt` — legendary, 4h grow, 8000 coin sell, pearl-coloured unicorn with a golden spiral horn, pastel rainbow mane along the back, and scattered sparkles. Unlocks at 18000 totalEarned.
 
-### Store changes
-- `useGameStore.ts`
-  - Added persisted fields `purchasedUpgrades: SpeedUpgradeId[]` and `settings.soundMuted: boolean`.
-  - `tick()` now reads `activeSpeedMultiplier(purchasedUpgrades)` and passes it into `isMature(plot, now, speedMult)` — growth ripens proportionally faster.
-  - Offline catch-up (`applyOfflineCatchup`) also takes the speed multiplier, so coming back after time away rewards upgrades retroactively.
-  - New actions: `buyUpgrade(id)` (validates funds + dedup, persists, toast), `toggleSoundMuted()` (persists), `notifyPointerBounce()` (UI-only signal).
-  - `spinLottery` keeps `spinAngle` for backwards compat but the component computes the real visible delta from the current rotation (see Lottery section).
+All six new types have:
+- Unique 4-colour palettes (`body`, `accent`, `shadow`, `glow`) feeding the radial-gradient body fill and accent details.
+- Hand-drawn inline SVG badges in `CatSprite.tsx` — no emoji, no clipart. Each one is distinguishable as a stage-2 cat at thumbnail size.
+- A matching seed via the existing `SEED_TYPES` derivation (no changes needed there since seeds are generated from `CAT_TYPE_ORDER`).
+- Unlock thresholds spaced so the player encounters them naturally between existing tiers.
 
-### Lottery wheel — pointer alignment fix
-- **Old bug:** pointer SVG was rotated 180° via CSS but the geometry resulted in the chevron tip floating above the wheel stage, never actually touching the winning sector. Visually disconnected.
-- **New pointer SVG:** teardrop with tip at the bottom (`d="M17 42 L4 12 Q17 0 30 12 Z"`, viewBox 34×44). Positioned `top: -20px` so the tip pokes 22px into the wheel circle.
-- **New rotation math:** computed in the component using the current rotation:
-  ```
-  sectorCenter = i * segAngle + segAngle/2
-  targetMod = ((-sectorCenter + jitter) % 360 + 360) % 360
-  delta = (targetMod - currentMod + 360) % 360
-  rotation += 5 * 360 + delta
-  ```
-  Guarantees the winning sector's center lands exactly under the pointer no matter where the wheel previously rested. Tiny in-sector jitter prevents the pointer from sitting on a separator line.
-- **Win confirmation:** pointer plays a `pointer-bounce` keyframe (cubic-bezier-back rotate + small vertical hop) when the wheel stops.
-- **Winning sector highlight:** other sectors dim to 45% opacity and the winning sector gets a deep stroke + drop-shadow halo while the prize modal is open.
+`CAT_TYPE_ORDER` was reordered so the shop / plant sheet shows cats sorted by progression value (graskatt → bamboukatt → blabarskatt → jordgubbskatt → kokosnotkatt → citruskatt → isbjornkatt → vulkankatt → regnbagskatt → drakkatt → stjarnkatt → enhornigskatt → rymkatt).
 
-### Sound integration points
-- `App.tsx` mounts a `useGlobalSoundEffects` watcher that plays `playLightning` when `activeStormPlot` flips, `playCoinEarn` when `coinPulseKey` increments, `playUnlockPlot` when `unlockedCatTypes.length` grows.
-- `PlotCard.tsx` plays `playPlant` on successful plant and `playHarvest` on successful harvest.
-- `Garden.tsx` plays `playHarvest` for the "Skörda alla" button.
-- `LotteryWheel.tsx` plays `playLotterySpin` on spin start, `playLotteryWin(isRare)` on win (rare = 500-coin prize or rare-seed prize), and `playCoinEarn` shortly after for coin wins.
-- `Shop.tsx` plays `playBuyUpgrade` for upgrade purchases and `playButton` for seed purchases.
-- HUD adds a mute toggle button (speaker icon) in the header. State persists in `settings.soundMuted` via `toggleSoundMuted`.
+### Feature 2 — 12 garden plots (was 6)
 
-### Mobile + onboarding polish
-- `.app-main` and `.app-header` horizontal padding tightened to `clamp(0.5rem, 3vw, 3rem)`. `.section-card` padding drops to `--space-md` at <420px. `garden-grid` switches to `repeat(auto-fill, minmax(140px, 1fr))` on narrow screens; 2-col at 420px+; 3-col at 600px+.
-- Locked plot's lock icon now has a 3px white halo + harder stroke for contrast.
-- `PlantSheet` rows show silhouette + "???" + "Lås upp i butiken" for locked seeds, mirroring the shop.
-- Plot 0 onboarding bubble: shows "Klicka för att plantera en Gräskatt!" when `totalEarned === 0 && plot.index === 0 && state === 'empty'`. White card with sakura-pink border, tail pointing down, gentle bob keyframe.
-- Empty plots get three SVG-tuft grass elements that sway with `grass-sway` keyframe (4s alternate; respects reduced-motion).
+`src/domain/plots.ts`:
+- `MAX_PLOTS` raised to 12.
+- `PLOT_UNLOCK_THRESHOLDS` extended with the spec-mandated values: `[0, 200, 800, 3000, 10000, 50000, 150000, 400000, 1000000, 3000000, 8000000, 20000000]`.
+- `padPlots` in `persistence.ts` was reworked to normalize legacy 6-plot saves up to 12 plots while preserving any in-progress growth.
+- Plot unlock tests in `plots.test.ts` extended to cover all 12 thresholds.
 
-### Speed multiplier visibility
-- HUD shows a "⚡Nx" chip next to "Totalt intjänat" when active.
-- Garden section header shows a "⚡Nx" chip.
-- Each growing plot card shows an "⚡Nx" badge in its top-left corner.
-- Growing time label uses speed-adjusted remaining time (e.g. with 2x, a 30s Gräskatt shows ~15s remaining).
+`src/components/Garden/garden.css`:
+- Grid now scales `repeat(auto-fill, minmax(132px, 1fr))` at the smallest size, 2-col at 420px, 3-col at 600px, **4-col at 1200px**. Twelve plots tile cleanly without overflow.
 
-### Initial-state fix (spec compliance)
-- `createInitialSave` now starts the player at 10 coins, 1 unlocked plot, 0 prefilled Gräskatt seeds (Gräskatt is infinite via the flag, so the player can plant freely). Matches spec.
+### Feature 3 — Expanded weather event system
 
-### Test runner
-- `npm i -D vitest` (added).
-- `package.json` scripts: `"test": "vitest run"`.
-- 3 test files, 24 tests passing (lottery.test.ts, plots.test.ts, upgrades.test.ts).
+New `src/domain/events.ts` (replaces the previous re-export file): a self-contained event catalogue of six weather events — `rain`, `lightning`, `ice`, `snow`, `tornado`, `meteor` — each with its own probability, bonus range, badge colour, sound, cooldown, and `canExceed100` flag matching the spec.
 
-### Coin shake feedback
-- HUD coin pill shakes when the player tries to spend (clicks any disabled `.seed-card-buy`, `.upgrade-buy`, or `.lottery-spin-btn`) while coins=0.
+- `WEATHER_EVENTS_BY_ID` — keyed lookup table for any event id.
+- `WEATHER_EVENTS` — array in common-to-rare order.
+- `rollWeatherBonus(event, rng)` — uniform pick within `[bonusMin, bonusMax]`.
+- `rollAnyWeatherEvent(cooldownState, now, rng)` — biased iteration that rolls rare-to-common, respects per-event cooldown, and returns the first event that fires this tick.
 
-## What Changed This Iteration (against feedback-001.md)
-- HIGH: Tests are runnable — added vitest devdep + test script; 24 tests pass.
-- HIGH: Initial state matches spec — 10 coins, 0 graskatt seeds (infinite flag).
-- HIGH: Mobile overflow fixed — narrower padding clamps + auto-fill grid at <420px.
-- HIGH: FloatingCoins rendered via new component + animated +N pill.
-- HIGH: Lottery pointer/rotation alignment fixed via redesigned pointer + delta-aware rotation math.
-- HIGH: Speed upgrades shop tab + HUD badge + applied multiplier in tick + persisted.
-- HIGH: Sound effects across plant, harvest, coin earn, lightning, unlock, lottery (spin + win, with rare variant), upgrade. Mute toggle in header.
-- MEDIUM: Plant sheet masks locked-seed names + stats.
-- MEDIUM: Onboarding speech bubble on plot 0 when totalEarned === 0.
-- MEDIUM: Locked-plot icon contrast bumped.
-- MEDIUM: Free-spin pip refresh interval tightened from 30s → 5s.
-- LOW: Idle grass-sway animation on empty plots.
-- LOW: Coin counter shakes on insufficient funds clicks.
+Plot state is now richer:
+
+```ts
+interface PlotState {
+  ...
+  /** legacy field, also the sum of all weatherBonusBreakdown values */
+  lightningBonus: number;
+  weatherEvents: string[];                    // unique event ids that hit this plot
+  weatherBonusBreakdown: Record<string, number>; // eventId → additive bonus
+}
+```
+
+`applyWeatherBonus(plot, eventId, bonus, perEventCap)` stacks events additively. Per-event cap is `1.0` for ordinary events (lightning, ice, rain, snow) and `Infinity` for tornado / meteor. The cross-event total is hard-capped at `WEATHER_BONUS_TOTAL_CAP = 5.0` (+500%) regardless of which events fire. `applyLightningBonus(plot, bonus)` is retained for backwards compatibility and now routes through `applyWeatherBonus` with a +100% per-event cap.
+
+`effectiveSellValue(plot)` multiplies the base sellValue by `(1 + plot.lightningBonus)`, so all bonuses naturally flow through. A graskatt that gets +500% bonus from a meteor pays out 60 coins instead of 10.
+
+### Store integration — `src/store/useGameStore.ts`
+
+- New persisted field `weatherCooldowns: Record<string, number | null>` tracks per-event last-fire timestamps; the legacy `lastStormAt` is kept for back-compat and back-filled into `weatherCooldowns.lightning` on load.
+- New ephemeral field `activeStrike: ActiveWeatherStrike | null` carries `{ id, plotIndex, eventId, bonus, triggeredAt }`. Auto-clears after `STRIKE_DISPLAY_MS = 1800ms` inside `tick()`.
+- `tick()` was rewritten to roll a single weather event per tick via `rollAnyWeatherEvent`, apply the bonus, push a toast like `"☄ Meteoritregn! Plot 7 fick +260% värde"`, and seed `activeStrike` so the UI can react.
+
+### Persistence + back-compat — `src/domain/persistence.ts`
+
+- `SaveData.weatherCooldowns` added; legacy `lastStormAt` retained but deprecated.
+- `padPlots()` and a new `normalizePlot()` helper backfill `weatherEvents` and `weatherBonusBreakdown` to safe defaults for old saves.
+- Old 6-plot saves auto-extend to 12 plots (extra plots default to `unlocked: false`).
+- Migrate gracefully recovers from missing or malformed fields.
+
+### Visual effects — `src/components/Garden/PlotCard.tsx`
+
+- **Stacked badges**: When a plot has been hit by multiple weather events, each event renders its own pill (emoji + bonus %) in the top-right of the plot card. Pills stack vertically. Colour and background come from the event's `badgeColor` / `badgeBg`.
+- **Active strike overlays** (only on the struck plot, only for `STRIKE_DISPLAY_MS`):
+  - **Lightning**: yellow electric border via inset box-shadow on `.plot-inner` (`fx-lightning`).
+  - **Tornado**: spinning rotate-720° animation on the cat sprite via `.fx-cat-target` (`fx-tornado`).
+  - **Ice**: blue-white shimmer border + cool radial highlight on `.plot-inner::before` (`fx-ice`).
+  - **Rain**: green-blue outer glow (`fx-rain`).
+  - **Snow**: pale white-blue glow + falling particle dots (`fx-snow`).
+  - **Meteor**: orange-red intense glow + `meteor-impact` shake + full-screen flash with deep amber/red gradient (`fx-meteor`).
+- Each strike spawns a **big emoji burst** rising above the plot card via the `weather-burst` keyframe (`scale 0.3 → 1.2 → 1` while translating −24px and fading).
+- Each strike spawns ~8–14 falling **particle dots** (rain droplets are elongated rounded rectangles; snow/ice are circles; meteor uses larger orange dots). Colour comes from the event's badge palette.
+
+### Full-screen flash — `src/components/effects/LightningFlash.tsx` + `App.css`
+
+Now reads `activeStrike` directly. Renders a `data-event={eventId}` overlay whose radial gradient is swapped per event via CSS custom property. Meteor uses a longer 1.1s pulse with a `[0, 1, 0.6, 0]` opacity envelope so the impact reads as a real screen flash, not a polite blink.
+
+### Sound effects — `src/hooks/useSoundEffects.ts`
+
+Added five new generated sounds tied to weather events:
+- `playTornado` — low rumbling sawtooth sweep 240Hz→60Hz + noise.
+- `playIce` — high crystalline triangle ping at 2.1kHz + a 3.2kHz overtone tail.
+- `playRain` — soft 700ms white-noise burst.
+- `playSnow` — gentle 3-note bell at 880/1175/1568Hz.
+- `playMeteor` — deep impact noise + 60Hz sub-bass thump + 180Hz→880Hz ascending sweep.
+
+`playWeather(eventId)` is a dispatcher that picks the right one for any event id. `App.tsx`'s `useGlobalSoundEffects` watches `activeStrike` (by stable `id`) and calls `playWeather(strike.eventId)` on each new strike — so every event type plays its own audio identity.
+
+### Tests
+
+- `src/domain/__tests__/events.test.ts` — 15 new tests covering: WEATHER_EVENTS catalogue completeness, spec probability values, `canExceed100` flag wiring, `rollWeatherBonus` boundaries, `rollAnyWeatherEvent` respecting cooldowns and producing null on bad rolls, plot-level stacking, duplicate-event handling, per-event caps, and the +500% total cap propagating through `effectiveSellValue`.
+- `plots.test.ts` updated to seed PlotState with the new `weatherEvents` / `weatherBonusBreakdown` fields and to assert all 12 plot unlock thresholds.
+- Total: **4 test files, 39 tests passing**.
+
+## What Changed This Iteration (against task instructions)
+
+- Feature 1: 6 new cats added with palettes, descriptions, unlock thresholds, and bespoke SVG badges. `CAT_TYPE_ORDER` reordered for progression.
+- Feature 2: 12 plot slots, new thresholds applied, padPlots/normalizePlot updated, grid scales to 4-col on wide screens.
+- Feature 3:
+  - 6-event catalogue with probabilities matching the spec.
+  - Multi-event stacking on a single plot, capped at +500% total.
+  - Persistent `weatherEvents` + `weatherBonusBreakdown` per plot.
+  - Distinct per-event visual: glow / shake / spin / particle pattern / burst emoji / full-screen flash gradient.
+  - Distinct per-event audio.
+  - Stacked badges on the plot card.
 
 ## Known Issues
-- AudioContext requires a user gesture before any sound plays in some browsers. Sound is silent until the player's first interaction; this matches typical web audio behavior and we don't pre-emptively prompt the user.
-- The existing local storage save from iteration 001 (10 coins + 3 graskatt seeds) will load as-is; the new initial state only affects fresh players. This is intentional — we don't wipe existing player progress.
+
+- Existing 6-plot saves from iteration 002 will auto-extend; the extra 6 plots show as locked. Player progress (coins, totalEarned, seedInventory, etc.) is preserved untouched.
+- AudioContext gesture-gating from iteration 002 is unchanged: the first weather event after page load is silent in browsers that require a user gesture before audio plays.
+- Tornado spin animation runs on the visible cat sprite; if the plot was already empty when the event hit (impossible currently — rolls only target growing plots), the animation would still try to apply on the `+` icon. Roll logic prevents this.
 
 ## Dev Server
+
 - URL: http://localhost:5173
 - Status: running
-- Command: `npm run dev`
-- Build: `npm run build` passes; 116.73 kB gzipped JS, 7.39 kB gzipped CSS.
-- Tests: `npm test` — 24 passing across 3 files.
+- Command: `npm run dev -- --port 5173`
+- Build: `npm run build` passes — 119.75 kB gzipped JS, 8.17 kB gzipped CSS.
+- Tests: `npm test` — 39 passing across 4 files.

@@ -371,16 +371,76 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* Lightning full-screen flash */
+/* Weather full-screen flash. The data-event attribute swaps the radial
+   gradient colour scheme per event type. */
 .lightning-flash {
   position: fixed;
   inset: 0;
-  background: radial-gradient(
-    circle at 50% 30%,
-    rgba(255, 235, 59, 0.5),
-    rgba(126, 87, 194, 0.4) 40%,
-    rgba(126, 87, 194, 0) 80%
+  background: var(
+    --flash-bg,
+    radial-gradient(
+      circle at 50% 30%,
+      rgba(255, 235, 59, 0.5),
+      rgba(126, 87, 194, 0.4) 40%,
+      rgba(126, 87, 194, 0) 80%
+    )
   );
   z-index: 99;
   pointer-events: none;
+}
+
+.lightning-flash[data-event='lightning'] {
+  --flash-bg: radial-gradient(
+    circle at 50% 30%,
+    rgba(252, 211, 77, 0.55),
+    rgba(126, 87, 194, 0.4) 40%,
+    rgba(126, 87, 194, 0) 80%
+  );
+}
+
+.lightning-flash[data-event='tornado'] {
+  --flash-bg: radial-gradient(
+    circle at 50% 50%,
+    rgba(167, 139, 250, 0.55),
+    rgba(76, 29, 149, 0.45) 40%,
+    rgba(76, 29, 149, 0) 80%
+  );
+}
+
+.lightning-flash[data-event='ice'] {
+  --flash-bg: radial-gradient(
+    circle at 50% 30%,
+    rgba(186, 230, 253, 0.7),
+    rgba(3, 105, 161, 0.45) 40%,
+    rgba(3, 105, 161, 0) 80%
+  );
+}
+
+.lightning-flash[data-event='rain'] {
+  --flash-bg: radial-gradient(
+    circle at 50% 30%,
+    rgba(110, 231, 183, 0.45),
+    rgba(6, 95, 70, 0.3) 40%,
+    rgba(6, 95, 70, 0) 80%
+  );
+}
+
+.lightning-flash[data-event='snow'] {
+  --flash-bg: radial-gradient(
+    circle at 50% 30%,
+    rgba(255, 255, 255, 0.75),
+    rgba(186, 230, 253, 0.55) 40%,
+    rgba(186, 230, 253, 0) 85%
+  );
+}
+
+.lightning-flash[data-event='meteor'] {
+  --flash-bg:
+    radial-gradient(
+      circle at 50% 25%,
+      rgba(254, 215, 170, 0.85),
+      rgba(220, 38, 38, 0.55) 30%,
+      rgba(146, 64, 14, 0.45) 55%,
+      rgba(0, 0, 0, 0.25) 90%
+    );
 }

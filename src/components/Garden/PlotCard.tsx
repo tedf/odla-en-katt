@@ -15,6 +15,11 @@ import {
 } from '../../domain/plots';
 import { activeSpeedMultiplier } from '../../domain/upgrades';
 import { formatRemaining, formatCoins } from '../../domain/time';
+import {
+  WEATHER_EVENTS_BY_ID,
+  getWeatherEvent,
+  type WeatherEventId,
+} from '../../domain/events';
 import { useGameStore } from '../../store/useGameStore';
 import { useSoundEffects } from '../../hooks/useSoundEffects';
 import { CatSprite } from '../CatDisplay/CatSprite';
@@ -27,13 +32,15 @@ interface PlotCardProps {
 export function PlotCard({ plot }: PlotCardProps) {
   const [showSheet, setShowSheet] = useState(false);
   const [now, setNow] = useState(Date.now());
-  const activeStormPlot = useGameStore((s) => s.activeStormPlot);
+  const activeStrike = useGameStore((s) => s.activeStrike);
   const plantSeed = useGameStore((s) => s.plantSeed);
   const harvestCat = useGameStore((s) => s.harvestCat);
   const totalEarned = useGameStore((s) => s.totalEarned);
   const purchasedUpgrades = useGameStore((s) => s.purchasedUpgrades);
   const speedMult = activeSpeedMultiplier(purchasedUpgrades);
   const { playPlant, playHarvest } = useSoundEffects();
+  const myStrike =
+    activeStrike && activeStrike.plotIndex === plot.index ? activeStrike : null;
 
   useEffect(() => {
     if (plot.state !== 'growing') return;
@@ -57,6 +64,10 @@ export function PlotCard({ plot }: PlotCardProps) {
   const classes = ['plot-card'];
   if (plot.state === 'ready') classes.push('is-ready');
   if (plot.state === 'empty') classes.push('is-empty');
+  if (myStrike) {
+    classes.push('fx-active');
+    classes.push(`fx-${myStrike.eventId}`);
+  }
 
   // First-time onboarding tooltip for plot 0 when the player has no money.
   const showOnboardTooltip =
@@ -71,13 +82,31 @@ export function PlotCard({ plot }: PlotCardProps) {
         aria-label={ariaLabelFor(plot, now, speedMult)}
         data-state={plot.state}
       >
-        {plot.lightningBonus > 0 && (
-          <span
-            className="plot-bolt-badge"
-            title={`Blixtbonus: +${Math.round(plot.lightningBonus * 100)}%`}
-          >
-            <BoltSvg /> +{Math.round(plot.lightningBonus * 100)}%
-          </span>
+        {/* Stacked weather badges (one per event id that hit this plot). */}
+        {plot.weatherEvents.length > 0 && (
+          <div className="plot-weather-badges" aria-hidden="true">
+            {plot.weatherEvents.map((eventId) => {
+              const event = getWeatherEvent(eventId);
+              const bonus = plot.weatherBonusBreakdown[eventId] ?? 0;
+              if (!event) return null;
+              return (
+                <span
+                  key={eventId}
+                  className={`plot-weather-badge weather-badge--${eventId}`}
+                  style={
+                    {
+                      ['--weather-fg' as string]: event.badgeColor,
+                      ['--weather-bg' as string]: event.badgeBg,
+                    } as React.CSSProperties
+                  }
+                  title={`${event.name}: +${Math.round(bonus * 100)}%`}
+                >
+                  <span className="badge-emoji">{event.emoji}</span>
+                  <span className="num">+{Math.round(bonus * 100)}%</span>
+                </span>
+              );
+            })}
+          </div>
         )}
 
         {speedMult > 1 && plot.state === 'growing' && (
@@ -89,10 +118,21 @@ export function PlotCard({ plot }: PlotCardProps) {
           </span>
         )}
 
-        {activeStormPlot === plot.index && (
-          <div className="plot-storm-cloud active" aria-hidden="true">
-            <StormCloud />
-          </div>
+        {myStrike && (
+          <>
+            <div
+              className="plot-weather-burst"
+              key={`burst-${myStrike.id}`}
+              aria-hidden="true"
+            >
+              {WEATHER_EVENTS_BY_ID[myStrike.eventId as WeatherEventId]?.emoji ??
+                '✨'}
+            </div>
+            <WeatherParticles
+              key={`particles-${myStrike.id}`}
+              eventId={myStrike.eventId}
+            />
+          </>
         )}
 
         <div className="plot-inner">
@@ -174,7 +214,7 @@ function GrowingStage({
 
   return (
     <>
-      <div className="plot-growing-stage">
+      <div className="plot-growing-stage fx-cat-target">
         <CatSprite catType={catType} size={96} stage={stage} wiggle />
       </div>
       <div className="plot-growing-meta">
@@ -195,6 +235,7 @@ function ReadyStage({ catType, plot }: { catType: CatTypeId; plot: PlotState }) 
   return (
     <>
       <motion.div
+        className="fx-cat-target"
         initial={{ scale: 0.4, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         transition={{ type: 'spring', stiffness: 220, damping: 14 }}
@@ -242,18 +283,43 @@ function ariaLabelFor(plot: PlotState, now: number, speedMult: number): string {
   return `Plot ${plot.index + 1}`;
 }
 
-function BoltSvg() {
-  return (
-    <svg width="10" height="14" viewBox="0 0 10 14" aria-hidden="true">
-      <path
-        d="M6 0 L0 8 L4 8 L3 14 L10 5 L6 5 Z"
-        fill="#FFEB3B"
-        stroke="#5A2B00"
-        strokeWidth="0.6"
-        strokeLinejoin="round"
+function WeatherParticles({ eventId }: { eventId: string }) {
+  const event = getWeatherEvent(eventId);
+  // Pick a particle count and colour appropriate for the event.
+  const count =
+    eventId === 'snow' || eventId === 'meteor'
+      ? 14
+      : eventId === 'rain'
+        ? 12
+        : eventId === 'ice'
+          ? 8
+          : eventId === 'tornado'
+            ? 10
+            : 8;
+  const color = event?.badgeColor ?? '#fff';
+
+  // Deterministic-ish layout via index to avoid layout thrash; falls back
+  // to random for natural-looking distribution.
+  const dots = Array.from({ length: count }, (_, i) => {
+    const left = (i * 53) % 100;
+    const size =
+      eventId === 'meteor' ? 5 : eventId === 'rain' ? 2 : eventId === 'snow' ? 4 : 3;
+    const delay = (i % 7) * 70;
+    return (
+      <span
+        key={i}
+        style={{
+          color,
+          left: `${left}%`,
+          width: `${size}px`,
+          height: `${eventId === 'rain' ? size * 5 : size}px`,
+          borderRadius: eventId === 'rain' ? '2px' : '50%',
+          animationDelay: `${delay}ms`,
+        }}
       />
-    </svg>
-  );
+    );
+  });
+  return <div className="plot-weather-particles">{dots}</div>;
 }
 
 function LockSvg() {
@@ -280,19 +346,3 @@ function LockSvg() {
   );
 }
 
-function StormCloud() {
-  return (
-    <svg width="56" height="40" viewBox="0 0 56 40" aria-hidden="true">
-      <ellipse cx="20" cy="20" rx="14" ry="10" fill="#7E57C2" />
-      <ellipse cx="38" cy="18" rx="14" ry="10" fill="#9575CD" />
-      <path
-        d="M 28 28 L 22 38 L 28 34 L 24 40"
-        stroke="#FFEB3B"
-        strokeWidth="3"
-        strokeLinejoin="round"
-        strokeLinecap="round"
-        fill="none"
-      />
-    </svg>
-  );
-}

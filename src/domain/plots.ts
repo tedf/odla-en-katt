@@ -15,20 +15,35 @@ export interface PlotState {
   catType: CatTypeId | null;
   /** Epoch ms when the seed was planted, null when empty. */
   plantedAt: number | null;
-  /** Additive bonus from lightning strikes (0..1.0). */
+  /**
+   * Additive total bonus from all weather events (sum of breakdown), capped at
+   * WEATHER_BONUS_CAP (5.0 = +500%). Kept under the legacy `lightningBonus`
+   * name for save-data compatibility. New code should read this via
+   * `effectiveSellValue(plot)` or `plot.weatherBonusTotal`.
+   */
   lightningBonus: number;
+  /** Ordered list of weather event ids that hit this plot during growth. */
+  weatherEvents: string[];
+  /** Per-event accumulated bonus magnitude (event id → additive bonus). */
+  weatherBonusBreakdown: Record<string, number>;
 }
 
-export const MAX_PLOTS = 6;
+export const MAX_PLOTS = 12;
 
 /** Lifetime earned thresholds for each plot index (0-based). */
 export const PLOT_UNLOCK_THRESHOLDS: readonly number[] = [
-  0,
-  200,
-  800,
-  3000,
-  10000,
-  50000,
+  0, // Plot 1 — always unlocked
+  200, // Plot 2
+  800, // Plot 3
+  3000, // Plot 4
+  10000, // Plot 5
+  50000, // Plot 6
+  150000, // Plot 7
+  400000, // Plot 8
+  1000000, // Plot 9
+  3000000, // Plot 10
+  8000000, // Plot 11
+  20000000, // Plot 12
 ];
 
 export function createEmptyPlot(index: number, unlocked: boolean): PlotState {
@@ -39,6 +54,8 @@ export function createEmptyPlot(index: number, unlocked: boolean): PlotState {
     catType: null,
     plantedAt: null,
     lightningBonus: 0,
+    weatherEvents: [],
+    weatherBonusBreakdown: {},
   };
 }
 
@@ -151,6 +168,8 @@ export function plantInPlot(
     catType,
     plantedAt: now,
     lightningBonus: 0,
+    weatherEvents: [],
+    weatherBonusBreakdown: {},
   };
 }
 
@@ -164,6 +183,8 @@ export function emptyPlotAfterHarvest(plot: PlotState): PlotState {
     catType: null,
     plantedAt: null,
     lightningBonus: 0,
+    weatherEvents: [],
+    weatherBonusBreakdown: {},
   };
 }
 
@@ -175,19 +196,65 @@ export function markReady(plot: PlotState): PlotState {
   return { ...plot, state: 'ready' };
 }
 
+/** Total weather bonus across all events is capped at +500% (5.0). */
+export const WEATHER_BONUS_TOTAL_CAP = 5.0;
+
 /**
- * Returns a new plot with an added lightning bonus, capped at +100%.
+ * Legacy helper retained for callers/tests that only think in terms of
+ * lightning. Caps a single event id ("lightning") at +100% while still
+ * obeying the global total cap.
  */
 export function applyLightningBonus(
   plot: PlotState,
   bonus: number,
 ): PlotState {
-  const next = Math.min(1.0, plot.lightningBonus + bonus);
-  return { ...plot, lightningBonus: next };
+  return applyWeatherBonus(plot, 'lightning', bonus, 1.0);
 }
 
 /**
- * Calculates the effective sell value at harvest including lightning bonus.
+ * Returns a new plot with an additional bonus from a weather event of the
+ * given id. Multiple distinct events stack additively up to
+ * WEATHER_BONUS_TOTAL_CAP. Repeat strikes of the same event id are bounded
+ * by `perEventCap` (default Infinity — single events such as Tornado or
+ * Meteor can exceed 100%).
+ *
+ * The first time a given event id strikes, it is appended to `weatherEvents`
+ * so the UI can render its badge; subsequent strikes of the same event id
+ * just increase that event's bonus magnitude.
+ */
+export function applyWeatherBonus(
+  plot: PlotState,
+  eventId: string,
+  bonus: number,
+  perEventCap: number = Number.POSITIVE_INFINITY,
+): PlotState {
+  const existing = plot.weatherBonusBreakdown[eventId] ?? 0;
+  const eventRemaining = Math.max(0, perEventCap - existing);
+  const totalRemaining = Math.max(
+    0,
+    WEATHER_BONUS_TOTAL_CAP - plot.lightningBonus,
+  );
+  const clamped = Math.min(eventRemaining, totalRemaining, Math.max(0, bonus));
+  if (clamped <= 0) return plot;
+
+  const breakdown: Record<string, number> = {
+    ...plot.weatherBonusBreakdown,
+    [eventId]: existing + clamped,
+  };
+  const events = plot.weatherEvents.includes(eventId)
+    ? plot.weatherEvents
+    : [...plot.weatherEvents, eventId];
+
+  return {
+    ...plot,
+    lightningBonus: plot.lightningBonus + clamped,
+    weatherEvents: events,
+    weatherBonusBreakdown: breakdown,
+  };
+}
+
+/**
+ * Calculates the effective sell value at harvest including weather bonuses.
  */
 export function effectiveSellValue(plot: PlotState): number {
   if (plot.catType === null) return 0;

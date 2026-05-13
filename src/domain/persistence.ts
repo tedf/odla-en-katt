@@ -25,7 +25,13 @@ export interface SaveData {
   seedInventory: Record<CatTypeId, number>;
   unlockedCatTypes: CatTypeId[];
   catsSoldByType: Record<CatTypeId, number>;
+  /**
+   * @deprecated retained for back-compat. Use `weatherCooldowns` for the
+   * new event system. Equivalent to weatherCooldowns.lightning.
+   */
   lastStormAt: number | null;
+  /** Per-event cooldown timestamps (epoch ms). Missing keys mean "never". */
+  weatherCooldowns: Record<string, number | null>;
   lottery: {
     lastFreeSpinAt: number | null;
     spinsToday: number;
@@ -62,8 +68,8 @@ function emptyCatsSold(): Record<CatTypeId, number> {
 
 export function createInitialSave(now: number): SaveData {
   const inv = emptySeedInventory();
-  // Gräskatt is infinite by spec — no prefill needed. Three free starter
-  // grass-cat seeds are available immediately via the infinite flag.
+  // Gräskatt is infinite by spec — no prefill needed. Free starter Gräskatt
+  // seeds are available immediately via the infinite flag.
   return {
     version: CURRENT_SAVE_VERSION,
     coins: 10,
@@ -73,6 +79,7 @@ export function createInitialSave(now: number): SaveData {
     unlockedCatTypes: ['graskatt'],
     catsSoldByType: emptyCatsSold(),
     lastStormAt: null,
+    weatherCooldowns: {},
     lottery: {
       lastFreeSpinAt: null,
       spinsToday: 0,
@@ -87,7 +94,7 @@ export function createInitialSave(now: number): SaveData {
   };
 }
 
-function isPlot(p: unknown): p is PlotState {
+function isPlot(p: unknown): p is Partial<PlotState> {
   if (typeof p !== 'object' || p === null) return false;
   const x = p as Record<string, unknown>;
   return (
@@ -100,8 +107,39 @@ function isPlot(p: unknown): p is PlotState {
   );
 }
 
-function padPlots(plots: PlotState[]): PlotState[] {
-  const result = [...plots];
+function normalizePlot(p: Partial<PlotState> & Record<string, unknown>): PlotState {
+  const weatherEventsRaw = p.weatherEvents;
+  const weatherEvents = Array.isArray(weatherEventsRaw)
+    ? (weatherEventsRaw.filter((v) => typeof v === 'string') as string[])
+    : [];
+  const breakdownRaw = p.weatherBonusBreakdown as
+    | Record<string, unknown>
+    | undefined;
+  const weatherBonusBreakdown: Record<string, number> = {};
+  if (breakdownRaw && typeof breakdownRaw === 'object') {
+    for (const [k, v] of Object.entries(breakdownRaw)) {
+      if (typeof v === 'number' && Number.isFinite(v)) {
+        weatherBonusBreakdown[k] = v;
+      }
+    }
+  }
+  return {
+    index: (p.index as number) ?? 0,
+    unlocked: Boolean(p.unlocked),
+    state: (p.state as PlotState['state']) ?? 'empty',
+    catType: (p.catType as CatTypeId | null) ?? null,
+    plantedAt: (p.plantedAt as number | null) ?? null,
+    lightningBonus:
+      typeof p.lightningBonus === 'number' ? p.lightningBonus : 0,
+    weatherEvents,
+    weatherBonusBreakdown,
+  };
+}
+
+function padPlots(plots: Partial<PlotState>[]): PlotState[] {
+  const result: PlotState[] = plots.map((p) =>
+    normalizePlot(p as Partial<PlotState> & Record<string, unknown>),
+  );
   while (result.length < MAX_PLOTS) {
     result.push({
       index: result.length,
@@ -110,6 +148,8 @@ function padPlots(plots: PlotState[]): PlotState[] {
       catType: null,
       plantedAt: null,
       lightningBonus: 0,
+      weatherEvents: [],
+      weatherBonusBreakdown: {},
     });
   }
   return result.slice(0, MAX_PLOTS).map((p, i) => ({ ...p, index: i }));
@@ -142,8 +182,25 @@ function migrate(raw: unknown, now: number): SaveData {
   const base = createInitialSave(now);
   const plots =
     Array.isArray(r.plots) && r.plots.every(isPlot)
-      ? padPlots(r.plots as PlotState[])
+      ? padPlots(r.plots as Partial<PlotState>[])
       : base.plots;
+
+  const weatherCooldownsRaw = r.weatherCooldowns as
+    | Record<string, unknown>
+    | undefined;
+  const weatherCooldowns: Record<string, number | null> = {};
+  if (weatherCooldownsRaw && typeof weatherCooldownsRaw === 'object') {
+    for (const [k, v] of Object.entries(weatherCooldownsRaw)) {
+      if (typeof v === 'number' && Number.isFinite(v)) {
+        weatherCooldowns[k] = v;
+      } else if (v === null) {
+        weatherCooldowns[k] = null;
+      }
+    }
+  } else if (typeof r.lastStormAt === 'number') {
+    // Back-fill old saves: lastStormAt → lightning cooldown.
+    weatherCooldowns.lightning = r.lastStormAt;
+  }
 
   const lotteryRaw = r.lottery as
     | { lastFreeSpinAt?: unknown; spinsToday?: unknown; spinsTodayDate?: unknown }
@@ -181,6 +238,7 @@ function migrate(raw: unknown, now: number): SaveData {
       typeof r.lastStormAt === 'number' || r.lastStormAt === null
         ? (r.lastStormAt as number | null)
         : null,
+    weatherCooldowns,
     lottery: {
       lastFreeSpinAt:
         typeof lotteryRaw?.lastFreeSpinAt === 'number' ||
