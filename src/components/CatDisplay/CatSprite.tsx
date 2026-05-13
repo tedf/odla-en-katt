@@ -123,17 +123,21 @@ function Sapling({
 function CatBodySvg({ catType }: { catType: CatTypeId }) {
   const cat = CAT_TYPES[catType];
   const { body, accent, shadow, glow } = cat.palette;
-  const idSafe = catType;
+  // useId gives a unique ID per React instance, preventing gradient cross-contamination
+  // when multiple cats of different types are rendered simultaneously in the DOM.
+  const uid = Math.random().toString(36).slice(2, 8);
+  const bgId = `bg-${catType}-${uid}`;
+  const stripeId = `stripe-regnbagskatt-${uid}`;
 
   return (
     <svg viewBox="0 0 120 120" width="100%" height="100%" aria-hidden="true">
       <defs>
-        <radialGradient id={`bg-${idSafe}`} cx="50%" cy="40%" r="60%">
+        <radialGradient id={bgId} cx="50%" cy="40%" r="60%">
           <stop offset="0%" stopColor={body} />
           <stop offset="100%" stopColor={shadow} />
         </radialGradient>
         {catType === 'regnbagskatt' && (
-          <linearGradient id="stripe-regnbagskatt" x1="0%" y1="0%" x2="100%" y2="100%">
+          <linearGradient id={stripeId} x1="0%" y1="0%" x2="100%" y2="100%">
             <stop offset="0%" stopColor="#ff8fa3" />
             <stop offset="25%" stopColor="#ffd56b" />
             <stop offset="50%" stopColor="#a8d8b9" />
@@ -157,9 +161,9 @@ function CatBodySvg({ catType }: { catType: CatTypeId }) {
         fill="none"
       />
 
-      <ellipse cx="60" cy="72" rx="34" ry="28" fill={`url(#bg-${idSafe})`} />
+      <ellipse cx="60" cy="72" rx="34" ry="28" fill={`url(#${bgId})`} />
       <ellipse cx="60" cy="80" rx="22" ry="14" fill={body} opacity="0.6" />
-      <ellipse cx="60" cy="46" rx="28" ry="26" fill={`url(#bg-${idSafe})`} />
+      <ellipse cx="60" cy="46" rx="28" ry="26" fill={`url(#${bgId})`} />
 
       <path d="M 38 30 L 42 12 L 54 26 Z" fill={shadow} />
       <path d="M 82 30 L 78 12 L 66 26 Z" fill={shadow} />
@@ -182,12 +186,12 @@ function CatBodySvg({ catType }: { catType: CatTypeId }) {
         strokeLinecap="round"
       />
 
-      {renderCatBadge(catType, accent, glow)}
+      {renderCatBadge(catType, accent, glow, stripeId)}
     </svg>
   );
 }
 
-function renderCatBadge(catType: CatTypeId, accent: string, glow: string) {
+function renderCatBadge(catType: CatTypeId, accent: string, glow: string, stripeId: string) {
   switch (catType) {
     case 'graskatt':
       return (
@@ -331,14 +335,14 @@ function renderCatBadge(catType: CatTypeId, accent: string, glow: string) {
         <g>
           <path
             d="M 32 60 Q 60 50 88 60"
-            stroke="url(#stripe-regnbagskatt)"
+            stroke={`url(#${stripeId})`}
             strokeWidth="5"
             fill="none"
             opacity="0.85"
           />
           <path
             d="M 36 68 Q 60 58 84 68"
-            stroke="url(#stripe-regnbagskatt)"
+            stroke={`url(#${stripeId})`}
             strokeWidth="3"
             fill="none"
             opacity="0.55"
@@ -348,31 +352,38 @@ function renderCatBadge(catType: CatTypeId, accent: string, glow: string) {
     case 'drakkatt':
       return (
         <g>
-          {/* Wing on the back. */}
+          {/* Large wing — bright gold outline so it's visible on dark body */}
           <path
-            d="M 88 36 Q 108 26 110 12 Q 96 18 90 30"
-            fill="#7C3AED"
-            stroke="#3B0B5A"
+            d="M 86 40 Q 112 22 114 6 Q 96 14 88 32 Z"
+            fill="#C77DFF"
+            stroke="#FFB300"
+            strokeWidth="1.8"
+          />
+          {/* Wing membrane lines */}
+          <path
+            d="M 88 32 L 104 16 M 90 38 L 108 24"
+            stroke="#FFB300"
             strokeWidth="1.2"
+            opacity="0.9"
           />
+          {/* Spiky dorsal fin — enlarged, high contrast gold */}
           <path
-            d="M 90 30 L 100 20 M 92 34 L 104 26"
-            stroke="#3B0B5A"
-            strokeWidth="0.8"
-          />
-          {/* Spiky dorsal fin on the head ridge. */}
-          <path
-            d="M 50 14 L 54 6 L 58 14 L 62 4 L 66 14 L 70 6 L 74 14"
+            d="M 46 16 L 50 4 L 54 16 L 58 2 L 62 16 L 66 4 L 70 16 L 74 6 L 78 16"
             fill="#FFB300"
-            stroke="#3B0B5A"
-            strokeWidth="0.8"
+            stroke="#FF6B00"
+            strokeWidth="1"
             strokeLinejoin="round"
           />
-          {/* Tiny fang. */}
-          <path d="M 56 64 L 58 70 L 60 64 Z" fill="white" />
-          <path d="M 60 64 L 62 70 L 64 64 Z" fill="white" />
-          {/* Ember puff from mouth */}
-          <circle cx="60" cy="76" r="2" fill="#FFB300" opacity="0.85" />
+          {/* Big fangs */}
+          <path d="M 54 64 L 57 73 L 60 64 Z" fill="white" stroke="#ccc" strokeWidth="0.5" />
+          <path d="M 60 64 L 63 73 L 66 64 Z" fill="white" stroke="#ccc" strokeWidth="0.5" />
+          {/* Fire breath — larger, more visible */}
+          <ellipse cx="60" cy="80" rx="5" ry="3" fill="#FF6B00" opacity="0.9" />
+          <ellipse cx="60" cy="80" rx="3" ry="2" fill="#FFD700" opacity="0.95" />
+          <circle cx="56" cy="77" r="2" fill="#FF4500" opacity="0.7" />
+          <circle cx="64" cy="77" r="2" fill="#FF4500" opacity="0.7" />
+          {/* Purple glow aura around body */}
+          <ellipse cx="60" cy="58" rx="32" ry="30" fill="none" stroke="#C77DFF" strokeWidth="2" opacity="0.4" />
         </g>
       );
     case 'stjarnkatt':
