@@ -1,131 +1,155 @@
-# Generator State — Iteration 003
+# Generator State — speed upgrades are time-limited consumables
 
-## What Was Built (incremental on iteration 002)
+## What Was Built (incremental on iteration 003)
 
-### Feature 1 — 6 new cat types (8 → 14)
+### Feature — speed upgrades become time-limited consumables
 
-Added in canonical progression order in `src/domain/catTypes.ts`:
+Previously, the four speed upgrades (Gödselvatten / Magisk Jord /
+Trollformelsfrö / Tidsmagi) were permanent unlocks: buying tier N hid
+all lower tiers from the shop. They are now **one-shot consumables**
+with a per-tier active duration. Only one boost can be active at a
+time, and re-buying replaces the current boost (resets the timer and
+swaps the multiplier).
 
-- `bamboukatt` — common, 25m grow, 90 coin sell, panda-coloured cat with bamboo stalk on belly + jade-green leaves above ears. Unlocks at 70 totalEarned.
-- `kokosnotkatt` — uncommon, 45m grow, 350 coin sell, sand-coloured with dark coconut shell pattern on belly and a palm-leaf tuft above the forehead. Unlocks at 900 totalEarned.
-- `isbjornkatt` — rare, 75m grow, 580 coin sell, white-bodied with arctic snowflake speckles and a tiny iceberg crown. Unlocks at 2200 totalEarned.
-- `vulkankatt` — rare, 90m grow, 700 coin sell, dark obsidian body with glowing lava cracks across the belly and embers floating above the head. Unlocks at 2800 totalEarned.
-- `drakkatt` — epic, 2h grow, 2500 coin sell, dragon-cat with a violet folded wing, golden saw-tooth spinal fin between the ears, and tiny fangs + ember puff. Unlocks at 6000 totalEarned.
-- `enhornigskatt` — legendary, 4h grow, 8000 coin sell, pearl-coloured unicorn with a golden spiral horn, pastel rainbow mane along the back, and scattered sparkles. Unlocks at 18000 totalEarned.
+#### Updated catalogue — `src/domain/upgrades.ts`
 
-All six new types have:
-- Unique 4-colour palettes (`body`, `accent`, `shadow`, `glow`) feeding the radial-gradient body fill and accent details.
-- Hand-drawn inline SVG badges in `CatSprite.tsx` — no emoji, no clipart. Each one is distinguishable as a stage-2 cat at thumbnail size.
-- A matching seed via the existing `SEED_TYPES` derivation (no changes needed there since seeds are generated from `CAT_TYPE_ORDER`).
-- Unlock thresholds spaced so the player encounters them naturally between existing tiers.
+| id        | name           | cost  | multiplier | duration |
+| --------- | -------------- | ----- | ---------- | -------- |
+| `speed_1` | Gödselvatten   | 50    | 1.5x       | 30 min   |
+| `speed_2` | Magisk Jord    | 200   | 2.0x       | 1 timme  |
+| `speed_3` | Trollformelsfrö| 800   | 3.0x       | 2 timmar |
+| `speed_4` | Tidsmagi       | 4000  | 5.0x       | 4 timmar |
 
-`CAT_TYPE_ORDER` was reordered so the shop / plant sheet shows cats sorted by progression value (graskatt → bamboukatt → blabarskatt → jordgubbskatt → kokosnotkatt → citruskatt → isbjornkatt → vulkankatt → regnbagskatt → drakkatt → stjarnkatt → enhornigskatt → rymkatt).
+The `SpeedUpgrade` interface gains `durationSeconds` and `emoji`. The
+old `activeSpeedMultiplier(purchasedIds)` and `nextAvailableUpgrade()`
+helpers are removed and replaced with:
 
-### Feature 2 — 12 garden plots (was 6)
+- `makeActiveUpgrade(upgradeId, now)` — builds an `ActiveSpeedUpgrade`
+  record `{ upgradeId, multiplier, expiresAt }` from a clock value.
+- `activeMultiplier(active, now)` — returns the live multiplier (or 1
+  if `active === null` / expired).
+- `pruneExpired(active, now)` — returns the upgrade if still live,
+  else `null`. Used by the store on load and on every tick.
+- `isValidUpgradeId(s)` — narrow type guard used by the save migration.
 
-`src/domain/plots.ts`:
-- `MAX_PLOTS` raised to 12.
-- `PLOT_UNLOCK_THRESHOLDS` extended with the spec-mandated values: `[0, 200, 800, 3000, 10000, 50000, 150000, 400000, 1000000, 3000000, 8000000, 20000000]`.
-- `padPlots` in `persistence.ts` was reworked to normalize legacy 6-plot saves up to 12 plots while preserving any in-progress growth.
-- Plot unlock tests in `plots.test.ts` extended to cover all 12 thresholds.
+#### Store changes — `src/store/useGameStore.ts`
 
-`src/components/Garden/garden.css`:
-- Grid now scales `repeat(auto-fill, minmax(132px, 1fr))` at the smallest size, 2-col at 420px, 3-col at 600px, **4-col at 1200px**. Twelve plots tile cleanly without overflow.
+- New persisted field `activeSpeedUpgrade: ActiveSpeedUpgrade | null`.
+  Legacy `purchasedUpgrades: SpeedUpgradeId[]` is retained for save
+  back-compat but is now always serialized as `[]`.
+- `buyUpgrade(id)` now:
+  - Deducts coins (no "already owned" guard — re-buys are allowed).
+  - Sets `activeSpeedUpgrade = makeActiveUpgrade(id, now)`.
+  - If a boost was already live, surfaces a "Ersatte föregående
+    boost" toast; otherwise a normal activation toast.
+- `tick()` prunes the expired upgrade *first* and uses the post-prune
+  multiplier for the growth math. The first tick after a boost expires
+  pushes a friendly toast ("⏰ Tidsmagi har tagit slut") and persists.
+- Offline catch-up on load uses the live multiplier if the saved boost
+  has not yet expired by `now`; expired boosts contribute 1x. (Strict
+  partial-window accounting was intentionally skipped.)
 
-### Feature 3 — Expanded weather event system
+#### Persistence — `src/domain/persistence.ts`
 
-New `src/domain/events.ts` (replaces the previous re-export file): a self-contained event catalogue of six weather events — `rain`, `lightning`, `ice`, `snow`, `tornado`, `meteor` — each with its own probability, bonus range, badge colour, sound, cooldown, and `canExceed100` flag matching the spec.
+- `SaveData` adds `activeSpeedUpgrade: ActiveSpeedUpgrade | null`.
+- Migration reads the field, validates each property with
+  `isValidUpgradeId` + finite-number checks, and drops the record if
+  `expiresAt <= now` (so timer-elapsed-while-offline restarts correctly).
+- `purchasedUpgrades` is migrated to `[]` regardless of input — legacy
+  permanent purchases are not converted into a live boost.
 
-- `WEATHER_EVENTS_BY_ID` — keyed lookup table for any event id.
-- `WEATHER_EVENTS` — array in common-to-rare order.
-- `rollWeatherBonus(event, rng)` — uniform pick within `[bonusMin, bonusMax]`.
-- `rollAnyWeatherEvent(cooldownState, now, rng)` — biased iteration that rolls rare-to-common, respects per-event cooldown, and returns the first event that fires this tick.
+#### Shop UI — `src/components/Shop/Shop.tsx` + `shop.css`
 
-Plot state is now richer:
+- The "Uppgraderingar" tab now ships two banner states:
+  - **Empty state** — dashed-border card with `⚡ Ingen aktiv boost` +
+    helper text inviting the player to buy a flask.
+  - **Active state** — a tier-coloured gradient banner with:
+    - Large boost emoji in a circular frame on the left.
+    - `AKTIV` pill, name + multiplier chip.
+    - Big tabular-numerals countdown (`M:SS` or `H:MM:SS`).
+    - 6px progress bar showing elapsed fraction (transitions smoothly).
+    - A slowly rotating conic-gradient sheen for atmosphere (disabled
+      under `prefers-reduced-motion`).
+  - The banner animates in / out via `framer-motion` `AnimatePresence`
+    so swapping boosts feels intentional.
+- All four upgrade cards are always purchasable. The buy button now
+  shows a contextual label:
+  - `Starta om` when the same boost is currently active.
+  - `Byt boost` when a different boost is active.
+  - No label (just the coin cost) when nothing is active.
+- A local `useEffect` interval ticks the countdown every second; the
+  interval is cleared when no boost is active.
+- A small emoji is shown next to each upgrade name in the card list.
 
-```ts
-interface PlotState {
-  ...
-  /** legacy field, also the sum of all weatherBonusBreakdown values */
-  lightningBonus: number;
-  weatherEvents: string[];                    // unique event ids that hit this plot
-  weatherBonusBreakdown: Record<string, number>; // eventId → additive bonus
-}
-```
+#### HUD chip — `src/components/HUD/HUD.tsx` + `hud.css`
 
-`applyWeatherBonus(plot, eventId, bonus, perEventCap)` stacks events additively. Per-event cap is `1.0` for ordinary events (lightning, ice, rain, snow) and `Infinity` for tornado / meteor. The cross-event total is hard-capped at `WEATHER_BONUS_TOTAL_CAP = 5.0` (+500%) regardless of which events fire. `applyLightningBonus(plot, bonus)` is retained for backwards compatibility and now routes through `applyWeatherBonus` with a +100% per-event cap.
+- The pre-existing `⚡Nx` chip is replaced by a richer pill that
+  shows the upgrade emoji, the multiplier, and the live countdown:
+  `💧 1.5x · 12:34`. It pulses gently to flag that something is on a
+  timer; the animation respects `prefers-reduced-motion`.
+- The HUD's per-second clock is throttled to 1s while a boost is
+  active and 5s otherwise (lottery pip refresh).
+- `formatCountdown(ms)` is exported from `HUD.tsx` for parity with the
+  shop banner.
 
-`effectiveSellValue(plot)` multiplies the base sellValue by `(1 + plot.lightningBonus)`, so all bonuses naturally flow through. A graskatt that gets +500% bonus from a meteor pays out 60 coins instead of 10.
+#### Garden / PlotCard wiring
 
-### Store integration — `src/store/useGameStore.ts`
+- Both components now read `activeSpeedUpgrade` and compute
+  `speedMult = activeMultiplier(activeSpeedUpgrade, now)`. PlotCard
+  re-uses its existing per-250ms `now` interval. Garden adds its own
+  1s ticker (only while a boost is active) to keep the heading chip
+  accurate.
 
-- New persisted field `weatherCooldowns: Record<string, number | null>` tracks per-event last-fire timestamps; the legacy `lastStormAt` is kept for back-compat and back-filled into `weatherCooldowns.lightning` on load.
-- New ephemeral field `activeStrike: ActiveWeatherStrike | null` carries `{ id, plotIndex, eventId, bonus, triggeredAt }`. Auto-clears after `STRIKE_DISPLAY_MS = 1800ms` inside `tick()`.
-- `tick()` was rewritten to roll a single weather event per tick via `rollAnyWeatherEvent`, apply the bonus, push a toast like `"☄ Meteoritregn! Plot 7 fick +260% värde"`, and seed `activeStrike` so the UI can react.
+#### Tests — `src/domain/__tests__/upgrades.test.ts`
 
-### Persistence + back-compat — `src/domain/persistence.ts`
+Rewritten for the new model. 11 assertions across:
 
-- `SaveData.weatherCooldowns` added; legacy `lastStormAt` retained but deprecated.
-- `padPlots()` and a new `normalizePlot()` helper backfill `weatherEvents` and `weatherBonusBreakdown` to safe defaults for old saves.
-- Old 6-plot saves auto-extend to 12 plots (extra plots default to `unlocked: false`).
-- Migrate gracefully recovers from missing or malformed fields.
-
-### Visual effects — `src/components/Garden/PlotCard.tsx`
-
-- **Stacked badges**: When a plot has been hit by multiple weather events, each event renders its own pill (emoji + bonus %) in the top-right of the plot card. Pills stack vertically. Colour and background come from the event's `badgeColor` / `badgeBg`.
-- **Active strike overlays** (only on the struck plot, only for `STRIKE_DISPLAY_MS`):
-  - **Lightning**: yellow electric border via inset box-shadow on `.plot-inner` (`fx-lightning`).
-  - **Tornado**: spinning rotate-720° animation on the cat sprite via `.fx-cat-target` (`fx-tornado`).
-  - **Ice**: blue-white shimmer border + cool radial highlight on `.plot-inner::before` (`fx-ice`).
-  - **Rain**: green-blue outer glow (`fx-rain`).
-  - **Snow**: pale white-blue glow + falling particle dots (`fx-snow`).
-  - **Meteor**: orange-red intense glow + `meteor-impact` shake + full-screen flash with deep amber/red gradient (`fx-meteor`).
-- Each strike spawns a **big emoji burst** rising above the plot card via the `weather-burst` keyframe (`scale 0.3 → 1.2 → 1` while translating −24px and fading).
-- Each strike spawns ~8–14 falling **particle dots** (rain droplets are elongated rounded rectangles; snow/ice are circles; meteor uses larger orange dots). Colour comes from the event's badge palette.
-
-### Full-screen flash — `src/components/effects/LightningFlash.tsx` + `App.css`
-
-Now reads `activeStrike` directly. Renders a `data-event={eventId}` overlay whose radial gradient is swapped per event via CSS custom property. Meteor uses a longer 1.1s pulse with a `[0, 1, 0.6, 0]` opacity envelope so the impact reads as a real screen flash, not a polite blink.
-
-### Sound effects — `src/hooks/useSoundEffects.ts`
-
-Added five new generated sounds tied to weather events:
-- `playTornado` — low rumbling sawtooth sweep 240Hz→60Hz + noise.
-- `playIce` — high crystalline triangle ping at 2.1kHz + a 3.2kHz overtone tail.
-- `playRain` — soft 700ms white-noise burst.
-- `playSnow` — gentle 3-note bell at 880/1175/1568Hz.
-- `playMeteor` — deep impact noise + 60Hz sub-bass thump + 180Hz→880Hz ascending sweep.
-
-`playWeather(eventId)` is a dispatcher that picks the right one for any event id. `App.tsx`'s `useGlobalSoundEffects` watches `activeStrike` (by stable `id`) and calls `playWeather(strike.eventId)` on each new strike — so every event type plays its own audio identity.
-
-### Tests
-
-- `src/domain/__tests__/events.test.ts` — 15 new tests covering: WEATHER_EVENTS catalogue completeness, spec probability values, `canExceed100` flag wiring, `rollWeatherBonus` boundaries, `rollAnyWeatherEvent` respecting cooldowns and producing null on bad rolls, plot-level stacking, duplicate-event handling, per-event caps, and the +500% total cap propagating through `effectiveSellValue`.
-- `plots.test.ts` updated to seed PlotState with the new `weatherEvents` / `weatherBonusBreakdown` fields and to assert all 12 plot unlock thresholds.
-- Total: **4 test files, 39 tests passing**.
+- Catalogue invariants (4 tiers; strictly increasing cost, multiplier,
+  duration; emoji present).
+- Exact spec values for cost / multiplier / `durationSeconds`.
+- `activeMultiplier` boundaries: `null`, mid-window, 1ms before
+  expiry, exact expiry, post-expiry.
+- `pruneExpired` returns the record while live and `null` once expired.
+- `makeActiveUpgrade` computes correct `expiresAt` and returns `null`
+  for unknown ids.
+- `isValidUpgradeId` accepts the four known ids and rejects others.
 
 ## What Changed This Iteration (against task instructions)
 
-- Feature 1: 6 new cats added with palettes, descriptions, unlock thresholds, and bespoke SVG badges. `CAT_TYPE_ORDER` reordered for progression.
-- Feature 2: 12 plot slots, new thresholds applied, padPlots/normalizePlot updated, grid scales to 4-col on wide screens.
-- Feature 3:
-  - 6-event catalogue with probabilities matching the spec.
-  - Multi-event stacking on a single plot, capped at +500% total.
-  - Persistent `weatherEvents` + `weatherBonusBreakdown` per plot.
-  - Distinct per-event visual: glow / shake / spin / particle pattern / burst emoji / full-screen flash gradient.
-  - Distinct per-event audio.
-  - Stacked badges on the plot card.
+- `SPEED_UPGRADES` now has `cost: 50/200/800/4000` (was
+  `100/500/2000/10000`) and `durationSeconds: 1800/3600/7200/14400`.
+- Per-tier `emoji` and `description` text now match the task spec
+  exactly (`💧 / ✨ / 🔮 / ⏰`, "1.5x hastighet i 30 min", etc.).
+- Store state migrated from `purchasedUpgrades: string[]` to
+  `activeSpeedUpgrade: ActiveSpeedUpgrade | null` while keeping a
+  legacy `purchasedUpgrades` field on `SaveData` for back-compat.
+- `buyUpgrade` allows re-purchase; same-or-different tier replaces the
+  current boost (resets the timer).
+- `tick()` auto-expires the boost and pushes an expiry toast.
+- Shop UI: prominent active banner with countdown + progress bar; all
+  cards remain purchasable; contextual `Starta om` / `Byt boost`
+  button labels.
+- HUD: chip now shows emoji + multiplier + countdown together.
+- Persistence: validates `activeSpeedUpgrade` on load and drops it if
+  already expired.
+- Tests rewritten — 44 tests passing across 4 files (was 39).
 
 ## Known Issues
 
-- Existing 6-plot saves from iteration 002 will auto-extend; the extra 6 plots show as locked. Player progress (coins, totalEarned, seedInventory, etc.) is preserved untouched.
-- AudioContext gesture-gating from iteration 002 is unchanged: the first weather event after page load is silent in browsers that require a user gesture before audio plays.
-- Tornado spin animation runs on the visible cat sprite; if the plot was already empty when the event hit (impossible currently — rolls only target growing plots), the animation would still try to apply on the `+` icon. Roll logic prevents this.
+- Offline catch-up math is approximate: if a boost expired *during*
+  the away window, we treat the whole away window as un-boosted. This
+  was a deliberate KISS choice; a strict implementation would split
+  the away window into "boosted" and "post-expiry" segments and apply
+  the multiplier to only the first segment.
+- The expiry toast fires on the first tick *after* `expiresAt`, which
+  in practice is within 1 second of the real expiry (tick cadence).
+  Visually, the HUD chip and shop banner already disappear at the
+  exact second `expiresAt` is reached because they read `now` directly.
 
 ## Dev Server
 
 - URL: http://localhost:5173
 - Status: running
 - Command: `npm run dev -- --port 5173`
-- Build: `npm run build` passes — 119.75 kB gzipped JS, 8.17 kB gzipped CSS.
-- Tests: `npm test` — 39 passing across 4 files.
+- Build: `npm run build` passes — 120.87 kB gzipped JS, 8.83 kB gzipped CSS.
+- Tests: `npm test -- --run` — 44 passing across 4 files.
