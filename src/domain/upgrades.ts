@@ -1,21 +1,27 @@
 /**
- * Speed upgrades — permanent (one-time) growth speed multipliers.
+ * Speed upgrades — time-limited consumables that multiply growth speed.
  *
- * Only the most expensive purchased upgrade is "active" (multipliers do not
- * stack). Once a tier is purchased, lower tiers are hidden from the shop.
- * The active multiplier applies to the effective grow rate of every plot.
+ * Each upgrade is purchased for coins and stays active for a fixed duration.
+ * Only one upgrade is active at a time: buying a new one (same or different
+ * tier) REPLACES the current one and resets the timer with the new multiplier.
+ * Once expired, the upgrade returns to its default (1x) and can be bought
+ * again as a fresh consumable.
  */
 
 export interface SpeedUpgrade {
   id: SpeedUpgradeId;
   name: string;
-  /** Multiplier applied to the growth rate. 1 = baseline. */
+  /** Multiplier applied to the growth rate while active. 1 = baseline. */
   multiplier: number;
-  /** One-time coin cost. */
+  /** Per-purchase coin cost. */
   cost: number;
+  /** Active duration in seconds. */
+  durationSeconds: number;
   /** Swedish UI description. */
   description: string;
-  /** Tier index (higher = better). Used to enforce strict tier ordering. */
+  /** Compact emoji used in HUD chip and shop card. */
+  emoji: string;
+  /** Tier index (higher = stronger). Retained for ordering/styling. */
   tier: number;
 }
 
@@ -30,63 +36,97 @@ export const SPEED_UPGRADES: readonly SpeedUpgrade[] = [
     id: 'speed_1',
     name: 'Gödselvatten',
     multiplier: 1.5,
-    cost: 100,
-    description: 'Odla 1.5x snabbare',
+    cost: 50,
+    durationSeconds: 30 * 60,
+    description: '1.5x hastighet i 30 min',
+    emoji: '💧',
     tier: 1,
   },
   {
     id: 'speed_2',
     name: 'Magisk Jord',
     multiplier: 2.0,
-    cost: 500,
-    description: 'Odla 2x snabbare',
+    cost: 200,
+    durationSeconds: 60 * 60,
+    description: '2x hastighet i 1 timme',
+    emoji: '✨',
     tier: 2,
   },
   {
     id: 'speed_3',
     name: 'Trollformelsfrö',
     multiplier: 3.0,
-    cost: 2000,
-    description: 'Odla 3x snabbare',
+    cost: 800,
+    durationSeconds: 2 * 60 * 60,
+    description: '3x hastighet i 2 timmar',
+    emoji: '🔮',
     tier: 3,
   },
   {
     id: 'speed_4',
     name: 'Tidsmagi',
     multiplier: 5.0,
-    cost: 10000,
-    description: 'Odla 5x snabbare',
+    cost: 4000,
+    durationSeconds: 4 * 60 * 60,
+    description: '5x hastighet i 4 timmar',
+    emoji: '⏰',
     tier: 4,
   },
 ];
 
-/**
- * Returns the active multiplier given a list of purchased upgrade ids.
- * Multipliers do not stack — the highest tier wins.
- */
-export function activeSpeedMultiplier(purchasedIds: readonly string[]): number {
-  let best = 1;
-  for (const u of SPEED_UPGRADES) {
-    if (purchasedIds.includes(u.id) && u.multiplier > best) {
-      best = u.multiplier;
-    }
-  }
-  return best;
+export interface ActiveSpeedUpgrade {
+  upgradeId: SpeedUpgradeId;
+  multiplier: number;
+  /** Epoch ms when the active boost expires. */
+  expiresAt: number;
 }
 
 /**
- * Returns the next upgrade tier the player could buy. Null if they own the
- * highest tier already.
+ * Returns the multiplier from an active speed upgrade, or 1 if none/expired.
  */
-export function nextAvailableUpgrade(
-  purchasedIds: readonly string[],
-): SpeedUpgrade | null {
-  const ownedTier = SPEED_UPGRADES.filter((u) => purchasedIds.includes(u.id))
-    .map((u) => u.tier)
-    .reduce((a, b) => Math.max(a, b), 0);
-  return SPEED_UPGRADES.find((u) => u.tier > ownedTier) ?? null;
+export function activeMultiplier(
+  active: ActiveSpeedUpgrade | null,
+  now: number,
+): number {
+  if (!active) return 1;
+  if (active.expiresAt <= now) return 1;
+  return active.multiplier;
+}
+
+/**
+ * Returns the active upgrade if it has not yet expired, otherwise null.
+ * Useful for pruning stale state on save load and after each tick.
+ */
+export function pruneExpired(
+  active: ActiveSpeedUpgrade | null,
+  now: number,
+): ActiveSpeedUpgrade | null {
+  if (!active) return null;
+  if (active.expiresAt <= now) return null;
+  return active;
+}
+
+/**
+ * Builds an active upgrade record for the given upgrade id starting now.
+ * Returns null if the id is unknown.
+ */
+export function makeActiveUpgrade(
+  upgradeId: SpeedUpgradeId,
+  now: number,
+): ActiveSpeedUpgrade | null {
+  const u = getUpgradeById(upgradeId);
+  if (!u) return null;
+  return {
+    upgradeId: u.id,
+    multiplier: u.multiplier,
+    expiresAt: now + u.durationSeconds * 1000,
+  };
 }
 
 export function getUpgradeById(id: string): SpeedUpgrade | null {
   return SPEED_UPGRADES.find((u) => u.id === id) ?? null;
+}
+
+export function isValidUpgradeId(id: string): id is SpeedUpgradeId {
+  return SPEED_UPGRADES.some((u) => u.id === id);
 }

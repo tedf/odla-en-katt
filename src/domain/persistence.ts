@@ -12,7 +12,8 @@ import type { CatTypeId } from './catTypes';
 import { CAT_TYPE_ORDER } from './catTypes';
 import type { PlotState } from './plots';
 import { createDefaultPlots, MAX_PLOTS } from './plots';
-import type { SpeedUpgradeId } from './upgrades';
+import type { ActiveSpeedUpgrade, SpeedUpgradeId } from './upgrades';
+import { isValidUpgradeId } from './upgrades';
 
 export const SAVE_KEY = 'grow-a-cat:save:v1';
 export const CURRENT_SAVE_VERSION = 1;
@@ -41,8 +42,14 @@ export interface SaveData {
     reducedMotion: boolean;
     soundMuted: boolean;
   };
-  /** Permanent speed-upgrade purchases. */
+  /**
+   * @deprecated retained for back-compat with v1 saves that stored permanent
+   * upgrade purchases. The new model uses `activeSpeedUpgrade` and treats
+   * upgrades as time-limited consumables. Always serialized as `[]`.
+   */
   purchasedUpgrades: SpeedUpgradeId[];
+  /** Currently-active time-limited speed boost, if any. */
+  activeSpeedUpgrade: ActiveSpeedUpgrade | null;
   lastTickAt: number;
 }
 
@@ -90,6 +97,7 @@ export function createInitialSave(now: number): SaveData {
       soundMuted: false,
     },
     purchasedUpgrades: [],
+    activeSpeedUpgrade: null,
     lastTickAt: now,
   };
 }
@@ -209,17 +217,35 @@ function migrate(raw: unknown, now: number): SaveData {
     | { reducedMotion?: unknown; soundMuted?: unknown }
     | undefined;
 
-  const validUpgradeIds = new Set<string>([
-    'speed_1',
-    'speed_2',
-    'speed_3',
-    'speed_4',
-  ]);
-  const purchasedUpgrades: SpeedUpgradeId[] = Array.isArray(r.purchasedUpgrades)
-    ? (r.purchasedUpgrades.filter(
-        (v) => typeof v === 'string' && validUpgradeIds.has(v),
-      ) as SpeedUpgradeId[])
-    : [];
+  // Time-limited consumable upgrades: read the active record and drop it
+  // if it has already expired by `now`. We intentionally do not migrate
+  // legacy `purchasedUpgrades` into an active record — the new model treats
+  // permanently-owned upgrades as a one-off; players keep their coins.
+  let activeSpeedUpgrade: ActiveSpeedUpgrade | null = null;
+  const rawActive = r.activeSpeedUpgrade as
+    | Partial<ActiveSpeedUpgrade>
+    | null
+    | undefined;
+  if (rawActive && typeof rawActive === 'object') {
+    const id = rawActive.upgradeId;
+    const mult = rawActive.multiplier;
+    const exp = rawActive.expiresAt;
+    if (
+      typeof id === 'string' &&
+      isValidUpgradeId(id) &&
+      typeof mult === 'number' &&
+      Number.isFinite(mult) &&
+      typeof exp === 'number' &&
+      Number.isFinite(exp) &&
+      exp > now
+    ) {
+      activeSpeedUpgrade = {
+        upgradeId: id,
+        multiplier: mult,
+        expiresAt: exp,
+      };
+    }
+  }
 
   return {
     version: CURRENT_SAVE_VERSION,
@@ -258,7 +284,8 @@ function migrate(raw: unknown, now: number): SaveData {
       reducedMotion: Boolean(settingsRaw?.reducedMotion),
       soundMuted: Boolean(settingsRaw?.soundMuted),
     },
-    purchasedUpgrades,
+    purchasedUpgrades: [],
+    activeSpeedUpgrade,
     lastTickAt: typeof r.lastTickAt === 'number' ? r.lastTickAt : now,
   };
 }

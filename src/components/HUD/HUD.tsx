@@ -8,7 +8,7 @@ import { useGameStore } from '../../store/useGameStore';
 import { nextPlotUnlock } from '../../domain/economy';
 import { formatCoins } from '../../domain/time';
 import { isFreeSpinAvailable } from '../../domain/lottery';
-import { activeSpeedMultiplier } from '../../domain/upgrades';
+import { activeMultiplier, getUpgradeById } from '../../domain/upgrades';
 import './hud.css';
 
 interface HUDProps {
@@ -21,16 +21,24 @@ export function HUD({ onOpenLottery, onOpenShop }: HUDProps) {
   const totalEarned = useGameStore((s) => s.totalEarned);
   const lottery = useGameStore((s) => s.lottery);
   const coinPulseKey = useGameStore((s) => s.coinPulseKey);
-  const purchasedUpgrades = useGameStore((s) => s.purchasedUpgrades);
-  const speedMult = activeSpeedMultiplier(purchasedUpgrades);
+  const activeSpeedUpgrade = useGameStore((s) => s.activeSpeedUpgrade);
 
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
-    // Tight 5s interval so the free-spin pip lights up within seconds of
-    // midnight rollover and after a spin.
-    const id = window.setInterval(() => setNow(Date.now()), 5_000);
+    // The lottery pip needs a coarse refresh (every 5s is fine); the speed
+    // boost chip needs a per-second tick to render its countdown smoothly.
+    const fast = activeSpeedUpgrade ? 1_000 : 5_000;
+    const id = window.setInterval(() => setNow(Date.now()), fast);
     return () => window.clearInterval(id);
-  }, []);
+  }, [activeSpeedUpgrade]);
+
+  const speedMult = activeMultiplier(activeSpeedUpgrade, now);
+  const speedEmoji = activeSpeedUpgrade
+    ? (getUpgradeById(activeSpeedUpgrade.upgradeId)?.emoji ?? '⚡')
+    : '⚡';
+  const speedRemainingMs = activeSpeedUpgrade
+    ? Math.max(0, activeSpeedUpgrade.expiresAt - now)
+    : 0;
 
   const freeSpin = isFreeSpinAvailable(lottery.lastFreeSpinAt, now);
   const nextUnlock = nextPlotUnlock(totalEarned);
@@ -83,9 +91,19 @@ export function HUD({ onOpenLottery, onOpenShop }: HUDProps) {
         </div>
         <div className="hud-coins-sub muted num">
           Totalt intjänat: {formatCoins(totalEarned)}
-          {speedMult > 1 && (
-            <span className="hud-speed-chip" title={`Hastighet: ${speedMult}x`}>
-              ⚡{speedMult}x
+          {speedMult > 1 && activeSpeedUpgrade && (
+            <span
+              className="hud-speed-chip"
+              title={`Hastighet: ${speedMult}x — ${formatCountdown(speedRemainingMs)} kvar`}
+              aria-label={`Hastighetsboost ${speedMult}x, ${formatCountdown(speedRemainingMs)} kvar`}
+            >
+              <span className="hud-speed-chip-icon" aria-hidden="true">
+                {speedEmoji}
+              </span>
+              <span className="hud-speed-chip-mult">{speedMult}x</span>
+              <span className="hud-speed-chip-time">
+                {formatCountdown(speedRemainingMs)}
+              </span>
             </span>
           )}
         </div>
@@ -125,6 +143,21 @@ export function HUD({ onOpenLottery, onOpenShop }: HUDProps) {
       </div>
     </section>
   );
+}
+
+/**
+ * Formats a remaining-time countdown.
+ * - >= 1h: `H:MM:SS`
+ * - <  1h: `M:SS`
+ */
+export function formatCountdown(ms: number): string {
+  const totalSec = Math.max(0, Math.floor(ms / 1000));
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  const pad = (n: number) => String(n).padStart(2, '0');
+  if (h > 0) return `${h}:${pad(m)}:${pad(s)}`;
+  return `${m}:${pad(s)}`;
 }
 
 function CoinIcon() {

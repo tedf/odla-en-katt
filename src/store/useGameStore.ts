@@ -39,8 +39,11 @@ import {
 } from '../domain/persistence';
 import { applyOfflineCatchup } from '../domain/time';
 import {
-  activeSpeedMultiplier,
+  activeMultiplier,
   getUpgradeById,
+  makeActiveUpgrade,
+  pruneExpired,
+  type ActiveSpeedUpgrade,
   type SpeedUpgradeId,
 } from '../domain/upgrades';
 
@@ -105,7 +108,13 @@ export interface GameState {
     reducedMotion: boolean;
     soundMuted: boolean;
   };
+  /**
+   * @deprecated retained for save back-compat. Speed upgrades are now
+   * time-limited consumables; the live state lives in `activeSpeedUpgrade`.
+   */
   purchasedUpgrades: SpeedUpgradeId[];
+  /** Currently-active speed boost (replaces previous on re-purchase). */
+  activeSpeedUpgrade: ActiveSpeedUpgrade | null;
   lastTickAt: number;
 
   // ---- ephemeral UI state ----
@@ -156,6 +165,18 @@ function nowMs(): number {
   return Date.now();
 }
 
+/** Compact duration label used as a toast fallback (e.g. "30 min", "1 timme"). */
+function formatDurationShort(seconds: number): string {
+  if (seconds < 60 * 60) {
+    const m = Math.round(seconds / 60);
+    return `${m} min`;
+  }
+  const hours = seconds / 3600;
+  if (hours === 1) return '1 timme';
+  if (Number.isInteger(hours)) return `${hours} timmar`;
+  return `${hours.toFixed(1)} timmar`;
+}
+
 function pushToast(
   list: ToastMessage[],
   kind: ToastMessage['kind'],
@@ -189,6 +210,7 @@ function persistFromState(state: GameState): void {
     lottery: state.lottery,
     settings: state.settings,
     purchasedUpgrades: state.purchasedUpgrades,
+    activeSpeedUpgrade: state.activeSpeedUpgrade,
     lastTickAt: state.lastTickAt,
   };
   writeSave(data);
@@ -228,8 +250,13 @@ function bootstrapInitialState(): InitialStateFields {
     return { ...p, unlocked: save.totalEarned >= threshold };
   });
 
-  // Offline catch-up — speed multiplier compresses elapsed time.
-  const speedMult = activeSpeedMultiplier(save.purchasedUpgrades);
+  // Offline catch-up — active speed boost compresses elapsed time, but only
+  // for the portion of the away window where the boost was still live.
+  // For simplicity we use the boost multiplier if it has not yet expired at
+  // `now`; expired boosts contribute 1x. (Strict partial-window accounting
+  // would require splitting the catch-up into segments; not done yet.)
+  const activeOnLoad = pruneExpired(save.activeSpeedUpgrade, now);
+  const speedMult = activeMultiplier(activeOnLoad, now);
   const awayMs = Math.max(0, now - save.lastTickAt);
   const { plots: caughtUp, recap } = applyOfflineCatchup(
     unlockedPlots,
@@ -255,6 +282,7 @@ function bootstrapInitialState(): InitialStateFields {
     lottery: save.lottery,
     settings: save.settings,
     purchasedUpgrades: save.purchasedUpgrades,
+    activeSpeedUpgrade: activeOnLoad,
     lastTickAt: now,
     toasts: [],
     floatingCoins: [],
@@ -275,7 +303,12 @@ export const useGameStore = create<GameState>((set, get) => ({
   tick: () => {
     const state = get();
     const now = nowMs();
-    const speedMult = activeSpeedMultiplier(state.purchasedUpgrades);
+    // Prune expired upgrade first so all downstream growth math uses the
+    // post-expiry multiplier within the same tick.
+    const prevActive = state.activeSpeedUpgrade;
+    const pruned = pruneExpired(prevActive, now);
+    let activeSpeedUpgrade: ActiveSpeedUpgrade | null = pruned;
+    const speedMult = activeMultiplier(activeSpeedUpgrade, now);
 
     let plots = state.plots;
     let weatherCooldowns: Record<string, number | null> = state.weatherCooldowns;
@@ -354,6 +387,21 @@ export const useGameStore = create<GameState>((set, get) => ({
       }
     }
 
+    // Surface a friendly toast the first tick after a boost expires so the
+    // player understands why their growth slowed down.
+    let speedUpgradeJustExpired = false;
+    if (prevActive && !pruned) {
+      const u = getUpgradeById(prevActive.upgradeId);
+      const label = u?.name ?? 'Hastighet';
+      toasts = pushToast(
+        toasts,
+        'info',
+        `${u?.emoji ?? '⏳'} ${label} har tagit slut`,
+        'Trädgården växer i normal takt igen.',
+      );
+      speedUpgradeJustExpired = true;
+    }
+
     // 3. Cull expired toasts by ttl.
     toasts = toasts.filter((t) => now - t.createdAt < t.ttl);
 
@@ -363,11 +411,12 @@ export const useGameStore = create<GameState>((set, get) => ({
       weatherCooldowns,
       activeStormPlot,
       activeStrike,
+      activeSpeedUpgrade,
       toasts,
       lastTickAt: now,
     });
 
-    if (changed) {
+    if (changed || speedUpgradeJustExpired) {
       persistFromState(get());
     }
   },
@@ -515,17 +564,25 @@ export const useGameStore = create<GameState>((set, get) => ({
     const state = get();
     const upgrade = getUpgradeById(upgradeId);
     if (!upgrade) return false;
-    if (state.purchasedUpgrades.includes(upgradeId)) return false;
     if (state.coins < upgrade.cost) return false;
+
+    const now = nowMs();
+    const next = makeActiveUpgrade(upgradeId, now);
+    if (!next) return false;
+
+    const prev = pruneExpired(state.activeSpeedUpgrade, now);
+    const replacing = prev !== null;
 
     set({
       coins: state.coins - upgrade.cost,
-      purchasedUpgrades: [...state.purchasedUpgrades, upgradeId],
+      activeSpeedUpgrade: next,
       toasts: pushToast(
         state.toasts,
         'success',
-        `${upgrade.name} aktiverad!`,
-        `Odlingen är nu ${upgrade.multiplier}x snabbare`,
+        `${upgrade.emoji} ${upgrade.name} aktiverad!`,
+        replacing
+          ? `Ersatte föregående boost — nu ${upgrade.multiplier}x i ${upgrade.description.split(' i ')[1] ?? formatDurationShort(upgrade.durationSeconds)}.`
+          : `Odlingen är nu ${upgrade.multiplier}x snabbare i ${upgrade.description.split(' i ')[1] ?? formatDurationShort(upgrade.durationSeconds)}.`,
       ),
     });
     persistFromState(get());

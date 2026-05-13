@@ -2,16 +2,23 @@
  * Garden — 6-plot grid. Each plot is a PlotCard with depth/lip styling.
  */
 
+import { useEffect, useState } from 'react';
 import { useGameStore } from '../../store/useGameStore';
 import { useSoundEffects } from '../../hooks/useSoundEffects';
-import { activeSpeedMultiplier } from '../../domain/upgrades';
+import { activeMultiplier } from '../../domain/upgrades';
 import { PlotCard } from './PlotCard';
 import './garden.css';
 
 export function Garden() {
   const plots = useGameStore((s) => s.plots);
-  const purchasedUpgrades = useGameStore((s) => s.purchasedUpgrades);
-  const speedMult = activeSpeedMultiplier(purchasedUpgrades);
+  const activeSpeedUpgrade = useGameStore((s) => s.activeSpeedUpgrade);
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!activeSpeedUpgrade) return;
+    const id = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, [activeSpeedUpgrade]);
+  const speedMult = activeMultiplier(activeSpeedUpgrade, now);
   const readyCount = plots.filter((p) => p.state === 'ready').length;
   const { playHarvest } = useSoundEffects();
 

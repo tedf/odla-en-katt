@@ -65,15 +65,57 @@
 }
 
 .hud-speed-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   background: linear-gradient(135deg, #a78bfa, #6f8fd9);
   color: white;
   font-family: var(--font-display);
   font-weight: 700;
-  padding: 2px 8px;
+  padding: 2px 8px 2px 6px;
   border-radius: var(--radius-pill);
-  font-size: 0.66rem;
-  letter-spacing: 0.04em;
+  font-size: 0.7rem;
+  letter-spacing: 0.03em;
   box-shadow: 0 2px 0 rgba(58, 45, 79, 0.2);
+  animation: speedChipPulse 2.2s ease-in-out infinite;
+}
+
+.hud-speed-chip-icon {
+  font-size: 0.9rem;
+  line-height: 1;
+}
+
+.hud-speed-chip-mult {
+  font-weight: 800;
+}
+
+.hud-speed-chip-time {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  padding-left: 6px;
+  margin-left: 2px;
+  border-left: 1px solid rgba(255, 255, 255, 0.4);
+  opacity: 0.95;
+}
+
+@keyframes speedChipPulse {
+  0%,
+  100% {
+    box-shadow:
+      0 2px 0 rgba(58, 45, 79, 0.2),
+      0 0 0 0 rgba(167, 139, 250, 0.45);
+  }
+  50% {
+    box-shadow:
+      0 2px 0 rgba(58, 45, 79, 0.2),
+      0 0 0 6px rgba(167, 139, 250, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hud-speed-chip {
+    animation: none;
+  }
 }
 
 .hud-hint {

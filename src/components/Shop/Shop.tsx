@@ -1,16 +1,18 @@
 /**
  * Shop — Frön (seeds), Mina frön (inventory), and Uppgraderingar
- * (permanent speed boosts) tabs. Buying spends coins.
+ * (time-limited speed boosts) tabs. Buying spends coins.
  */
 
-import { useState } from 'react';
-import { motion } from 'framer-motion';
+import { useEffect, useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { CAT_TYPES, type CatTypeId } from '../../domain/catTypes';
 import { visibleSeeds } from '../../domain/economy';
 import { formatCoins, formatRemaining } from '../../domain/time';
 import {
   SPEED_UPGRADES,
-  activeSpeedMultiplier,
+  activeMultiplier,
+  getUpgradeById,
+  type ActiveSpeedUpgrade,
   type SpeedUpgradeId,
 } from '../../domain/upgrades';
 import { useGameStore } from '../../store/useGameStore';
@@ -26,13 +28,12 @@ export function Shop() {
   const totalEarned = useGameStore((s) => s.totalEarned);
   const catsSold = useGameStore((s) => s.catsSoldByType);
   const seedInventory = useGameStore((s) => s.seedInventory);
-  const purchasedUpgrades = useGameStore((s) => s.purchasedUpgrades);
+  const activeSpeedUpgrade = useGameStore((s) => s.activeSpeedUpgrade);
   const buySeed = useGameStore((s) => s.buySeed);
   const buyUpgrade = useGameStore((s) => s.buyUpgrade);
   const { playBuyUpgrade, playButton } = useSoundEffects();
 
   const seeds = visibleSeeds(totalEarned, catsSold.graskatt ?? 0);
-  const activeMult = activeSpeedMultiplier(purchasedUpgrades);
 
   return (
     <section className="section-card shop" aria-label="Butik">
@@ -113,43 +114,141 @@ export function Shop() {
       )}
 
       {tab === 'uppgraderingar' && (
-        <div role="tabpanel">
-          <div className="upgrade-banner">
-            <div>
-              <span className="upgrade-banner-label">Nuvarande hastighet</span>
-              <span className="upgrade-banner-value num">{activeMult}x</span>
-            </div>
-            <div className="upgrade-banner-help">
-              En aktiv uppgradering åt gången — högsta nivån räknas.
-            </div>
-          </div>
-          <ul className="shop-list">
-            {SPEED_UPGRADES.map((u) => {
-              const owned = purchasedUpgrades.includes(u.id);
-              const active = activeMult === u.multiplier && owned;
-              const canAfford = coins >= u.cost;
-              return (
-                <UpgradeCard
-                  key={u.id}
-                  upgradeId={u.id}
-                  name={u.name}
-                  description={u.description}
-                  cost={u.cost}
-                  multiplier={u.multiplier}
-                  tier={u.tier}
-                  owned={owned}
-                  active={active}
-                  canAfford={canAfford}
-                  onBuy={() => {
-                    if (buyUpgrade(u.id)) playBuyUpgrade();
-                  }}
-                />
-              );
-            })}
-          </ul>
-        </div>
+        <UpgradesTab
+          coins={coins}
+          activeSpeedUpgrade={activeSpeedUpgrade}
+          onBuy={(id) => {
+            if (buyUpgrade(id)) playBuyUpgrade();
+          }}
+        />
       )}
     </section>
+  );
+}
+
+interface UpgradesTabProps {
+  coins: number;
+  activeSpeedUpgrade: ActiveSpeedUpgrade | null;
+  onBuy: (id: SpeedUpgradeId) => void;
+}
+
+function UpgradesTab({ coins, activeSpeedUpgrade, onBuy }: UpgradesTabProps) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!activeSpeedUpgrade) return;
+    const id = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, [activeSpeedUpgrade]);
+
+  const liveMult = activeMultiplier(activeSpeedUpgrade, now);
+  const remainingMs = activeSpeedUpgrade
+    ? Math.max(0, activeSpeedUpgrade.expiresAt - now)
+    : 0;
+  const activeDef = activeSpeedUpgrade
+    ? getUpgradeById(activeSpeedUpgrade.upgradeId)
+    : null;
+  const totalMs = activeDef ? activeDef.durationSeconds * 1000 : 0;
+  const progress =
+    totalMs > 0 ? Math.min(1, Math.max(0, 1 - remainingMs / totalMs)) : 1;
+
+  return (
+    <div role="tabpanel">
+      <AnimatePresence mode="popLayout">
+        {activeSpeedUpgrade && activeDef && liveMult > 1 ? (
+          <motion.div
+            key={`active-${activeSpeedUpgrade.upgradeId}-${activeSpeedUpgrade.expiresAt}`}
+            initial={{ opacity: 0, y: -8, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -4, scale: 0.98 }}
+            transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+            className={`upgrade-active-banner tier-${activeDef.tier}`}
+            role="status"
+            aria-live="polite"
+          >
+            <div className="upgrade-active-glow" aria-hidden="true" />
+            <div className="upgrade-active-icon" aria-hidden="true">
+              <span className="upgrade-active-emoji">{activeDef.emoji}</span>
+            </div>
+            <div className="upgrade-active-body">
+              <div className="upgrade-active-tag">Aktiv</div>
+              <div className="upgrade-active-title">
+                {activeDef.name}
+                <span className="upgrade-active-mult num">
+                  {activeDef.multiplier}x
+                </span>
+              </div>
+              <div className="upgrade-active-countdown num">
+                {formatCountdown(remainingMs)} kvar
+              </div>
+              <div
+                className="upgrade-active-progress"
+                role="progressbar"
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={Math.round(progress * 100)}
+              >
+                <span
+                  className="upgrade-active-progress-fill"
+                  style={{ width: `${progress * 100}%` }}
+                />
+              </div>
+            </div>
+          </motion.div>
+        ) : (
+          <motion.div
+            key="empty-banner"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="upgrade-empty-banner"
+          >
+            <span className="upgrade-empty-icon" aria-hidden="true">
+              ⚡
+            </span>
+            <div>
+              <div className="upgrade-empty-title">
+                Ingen aktiv boost
+              </div>
+              <div className="upgrade-empty-help">
+                Köp en flaska för att snabba upp trädgården en stund.
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <ul className="shop-list">
+        {SPEED_UPGRADES.map((u) => {
+          const isActive =
+            !!activeSpeedUpgrade &&
+            activeSpeedUpgrade.upgradeId === u.id &&
+            liveMult > 1;
+          const canAfford = coins >= u.cost;
+          return (
+            <UpgradeCard
+              key={u.id}
+              upgrade={{
+                id: u.id,
+                name: u.name,
+                description: u.description,
+                cost: u.cost,
+                multiplier: u.multiplier,
+                tier: u.tier,
+                emoji: u.emoji,
+                durationSeconds: u.durationSeconds,
+              }}
+              isActive={isActive}
+              hasOtherActive={
+                !!activeSpeedUpgrade && !isActive && liveMult > 1
+              }
+              canAfford={canAfford}
+              onBuy={() => onBuy(u.id)}
+            />
+          );
+        })}
+      </ul>
+    </div>
   );
 }
 
@@ -225,34 +324,32 @@ function SeedCard({ catId, unlocked, coins, onBuy }: SeedCardProps) {
 }
 
 interface UpgradeCardProps {
-  upgradeId: SpeedUpgradeId;
-  name: string;
-  description: string;
-  cost: number;
-  multiplier: number;
-  tier: number;
-  owned: boolean;
-  active: boolean;
+  upgrade: {
+    id: SpeedUpgradeId;
+    name: string;
+    description: string;
+    cost: number;
+    multiplier: number;
+    tier: number;
+    emoji: string;
+    durationSeconds: number;
+  };
+  isActive: boolean;
+  hasOtherActive: boolean;
   canAfford: boolean;
   onBuy: () => void;
 }
 
 function UpgradeCard({
-  upgradeId,
-  name,
-  description,
-  cost,
-  multiplier,
-  tier,
-  owned,
-  active,
+  upgrade,
+  isActive,
+  hasOtherActive,
   canAfford,
   onBuy,
 }: UpgradeCardProps) {
   const [shake, setShake] = useState(0);
 
   const handleClick = () => {
-    if (owned) return;
     if (!canAfford) {
       setShake(shake + 1);
       return;
@@ -260,44 +357,58 @@ function UpgradeCard({
     onBuy();
   };
 
+  const buyLabel = isActive
+    ? 'Starta om'
+    : hasOtherActive
+    ? 'Byt boost'
+    : null;
+
   return (
     <motion.li
-      key={upgradeId + ':' + shake}
+      key={`${upgrade.id}-${shake}`}
       className={[
         'upgrade-card',
-        owned ? 'owned' : '',
-        active ? 'active' : '',
+        isActive ? 'active' : '',
       ]
         .filter(Boolean)
         .join(' ')}
       animate={shake > 0 ? { x: [0, -6, 6, -4, 4, 0] } : { x: 0 }}
       transition={{ duration: 0.32 }}
     >
-      <div className={`upgrade-tier tier-${tier}`} aria-hidden="true">
-        <PotionSvg tier={tier} />
+      <div className={`upgrade-tier tier-${upgrade.tier}`} aria-hidden="true">
+        <PotionSvg tier={upgrade.tier} />
       </div>
       <div className="upgrade-body">
         <div className="upgrade-title">
-          <span className="upgrade-name">{name}</span>
-          <span className="upgrade-mult num">{multiplier}x</span>
+          <span className="upgrade-name">
+            <span className="upgrade-emoji" aria-hidden="true">
+              {upgrade.emoji}
+            </span>
+            {upgrade.name}
+          </span>
+          <span className="upgrade-mult num">{upgrade.multiplier}x</span>
         </div>
-        <div className="upgrade-meta">{description}</div>
+        <div className="upgrade-meta">{upgrade.description}</div>
       </div>
       <div className="upgrade-actions">
-        {active ? (
-          <span className="upgrade-tag active-tag">Aktiv</span>
-        ) : owned ? (
-          <span className="upgrade-tag owned-tag">Ägd</span>
-        ) : (
-          <button
-            type="button"
-            className="upgrade-buy"
-            disabled={!canAfford}
-            onClick={handleClick}
-          >
-            <CoinDot /> {formatCoins(cost)}
-          </button>
-        )}
+        <button
+          type="button"
+          className={[
+            'upgrade-buy',
+            buyLabel ? 'upgrade-buy-restart' : '',
+          ]
+            .filter(Boolean)
+            .join(' ')}
+          disabled={!canAfford}
+          onClick={handleClick}
+        >
+          {buyLabel ? (
+            <span className="upgrade-buy-label">{buyLabel}</span>
+          ) : null}
+          <span className="upgrade-buy-cost">
+            <CoinDot /> {formatCoins(upgrade.cost)}
+          </span>
+        </button>
       </div>
     </motion.li>
   );
@@ -324,6 +435,22 @@ function rarityLabel(r: string): string {
     mythic: 'Mytisk',
   };
   return map[r] ?? r;
+}
+
+/**
+ * Mirrors HUD.formatCountdown — kept local to avoid a circular import
+ * between sibling components. Format:
+ * - >= 1h: `H:MM:SS`
+ * - <  1h: `M:SS`
+ */
+function formatCountdown(ms: number): string {
+  const totalSec = Math.max(0, Math.floor(ms / 1000));
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  const pad = (n: number) => String(n).padStart(2, '0');
+  if (h > 0) return `${h}:${pad(m)}:${pad(s)}`;
+  return `${m}:${pad(s)}`;
 }
 
 function BagIcon() {

@@ -13,7 +13,7 @@ import {
   timeRemaining,
   type PlotState,
 } from '../../domain/plots';
-import { activeSpeedMultiplier } from '../../domain/upgrades';
+import { activeMultiplier } from '../../domain/upgrades';
 import { formatRemaining, formatCoins } from '../../domain/time';
 import {
   WEATHER_EVENTS_BY_ID,
@@ -36,8 +36,8 @@ export function PlotCard({ plot }: PlotCardProps) {
   const plantSeed = useGameStore((s) => s.plantSeed);
   const harvestCat = useGameStore((s) => s.harvestCat);
   const totalEarned = useGameStore((s) => s.totalEarned);
-  const purchasedUpgrades = useGameStore((s) => s.purchasedUpgrades);
-  const speedMult = activeSpeedMultiplier(purchasedUpgrades);
+  const activeSpeedUpgrade = useGameStore((s) => s.activeSpeedUpgrade);
+  const speedMult = activeMultiplier(activeSpeedUpgrade, now);
   const { playPlant, playHarvest } = useSoundEffects();
   const myStrike =
     activeStrike && activeStrike.plotIndex === plot.index ? activeStrike : null;
