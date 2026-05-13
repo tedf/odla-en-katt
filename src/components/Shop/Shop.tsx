@@ -1,5 +1,6 @@
 /**
- * Shop — Frön (seed) tab + Mina frön (my seeds) tab. Buying spends coins.
+ * Shop — Frön (seeds), Mina frön (inventory), and Uppgraderingar
+ * (permanent speed boosts) tabs. Buying spends coins.
  */
 
 import { useState } from 'react';
@@ -7,11 +8,17 @@ import { motion } from 'framer-motion';
 import { CAT_TYPES, type CatTypeId } from '../../domain/catTypes';
 import { visibleSeeds } from '../../domain/economy';
 import { formatCoins, formatRemaining } from '../../domain/time';
+import {
+  SPEED_UPGRADES,
+  activeSpeedMultiplier,
+  type SpeedUpgradeId,
+} from '../../domain/upgrades';
 import { useGameStore } from '../../store/useGameStore';
+import { useSoundEffects } from '../../hooks/useSoundEffects';
 import { CatSprite } from '../CatDisplay/CatSprite';
 import './shop.css';
 
-type ShopTab = 'frön' | 'stall';
+type ShopTab = 'frön' | 'stall' | 'uppgraderingar';
 
 export function Shop() {
   const [tab, setTab] = useState<ShopTab>('frön');
@@ -19,9 +26,13 @@ export function Shop() {
   const totalEarned = useGameStore((s) => s.totalEarned);
   const catsSold = useGameStore((s) => s.catsSoldByType);
   const seedInventory = useGameStore((s) => s.seedInventory);
+  const purchasedUpgrades = useGameStore((s) => s.purchasedUpgrades);
   const buySeed = useGameStore((s) => s.buySeed);
+  const buyUpgrade = useGameStore((s) => s.buyUpgrade);
+  const { playBuyUpgrade, playButton } = useSoundEffects();
 
   const seeds = visibleSeeds(totalEarned, catsSold.graskatt ?? 0);
+  const activeMult = activeSpeedMultiplier(purchasedUpgrades);
 
   return (
     <section className="section-card shop" aria-label="Butik">
@@ -51,6 +62,14 @@ export function Shop() {
         >
           Mina frön
         </button>
+        <button
+          role="tab"
+          aria-selected={tab === 'uppgraderingar'}
+          className={tab === 'uppgraderingar' ? 'active' : ''}
+          onClick={() => setTab('uppgraderingar')}
+        >
+          Uppgraderingar
+        </button>
       </div>
 
       {tab === 'frön' && (
@@ -61,7 +80,9 @@ export function Shop() {
               catId={cat.id}
               unlocked={unlocked}
               coins={coins}
-              onBuy={() => buySeed(cat.id)}
+              onBuy={() => {
+                if (buySeed(cat.id)) playButton();
+              }}
             />
           ))}
         </ul>
@@ -89,6 +110,44 @@ export function Shop() {
             );
           })}
         </ul>
+      )}
+
+      {tab === 'uppgraderingar' && (
+        <div role="tabpanel">
+          <div className="upgrade-banner">
+            <div>
+              <span className="upgrade-banner-label">Nuvarande hastighet</span>
+              <span className="upgrade-banner-value num">{activeMult}x</span>
+            </div>
+            <div className="upgrade-banner-help">
+              En aktiv uppgradering åt gången — högsta nivån räknas.
+            </div>
+          </div>
+          <ul className="shop-list">
+            {SPEED_UPGRADES.map((u) => {
+              const owned = purchasedUpgrades.includes(u.id);
+              const active = activeMult === u.multiplier && owned;
+              const canAfford = coins >= u.cost;
+              return (
+                <UpgradeCard
+                  key={u.id}
+                  upgradeId={u.id}
+                  name={u.name}
+                  description={u.description}
+                  cost={u.cost}
+                  multiplier={u.multiplier}
+                  tier={u.tier}
+                  owned={owned}
+                  active={active}
+                  canAfford={canAfford}
+                  onBuy={() => {
+                    if (buyUpgrade(u.id)) playBuyUpgrade();
+                  }}
+                />
+              );
+            })}
+          </ul>
+        </div>
       )}
     </section>
   );
@@ -159,6 +218,85 @@ function SeedCard({ catId, unlocked, coins, onBuy }: SeedCardProps) {
           <span className="seed-card-tag locked-tag">
             <LockMini /> Låst
           </span>
+        )}
+      </div>
+    </motion.li>
+  );
+}
+
+interface UpgradeCardProps {
+  upgradeId: SpeedUpgradeId;
+  name: string;
+  description: string;
+  cost: number;
+  multiplier: number;
+  tier: number;
+  owned: boolean;
+  active: boolean;
+  canAfford: boolean;
+  onBuy: () => void;
+}
+
+function UpgradeCard({
+  upgradeId,
+  name,
+  description,
+  cost,
+  multiplier,
+  tier,
+  owned,
+  active,
+  canAfford,
+  onBuy,
+}: UpgradeCardProps) {
+  const [shake, setShake] = useState(0);
+
+  const handleClick = () => {
+    if (owned) return;
+    if (!canAfford) {
+      setShake(shake + 1);
+      return;
+    }
+    onBuy();
+  };
+
+  return (
+    <motion.li
+      key={upgradeId + ':' + shake}
+      className={[
+        'upgrade-card',
+        owned ? 'owned' : '',
+        active ? 'active' : '',
+      ]
+        .filter(Boolean)
+        .join(' ')}
+      animate={shake > 0 ? { x: [0, -6, 6, -4, 4, 0] } : { x: 0 }}
+      transition={{ duration: 0.32 }}
+    >
+      <div className={`upgrade-tier tier-${tier}`} aria-hidden="true">
+        <PotionSvg tier={tier} />
+      </div>
+      <div className="upgrade-body">
+        <div className="upgrade-title">
+          <span className="upgrade-name">{name}</span>
+          <span className="upgrade-mult num">{multiplier}x</span>
+        </div>
+        <div className="upgrade-meta">{description}</div>
+      </div>
+      <div className="upgrade-actions">
+        {active ? (
+          <span className="upgrade-tag active-tag">Aktiv</span>
+        ) : owned ? (
+          <span className="upgrade-tag owned-tag">Ägd</span>
+        ) : (
+          <button
+            type="button"
+            className="upgrade-buy"
+            disabled={!canAfford}
+            onClick={handleClick}
+          >
+            <CoinDot /> {formatCoins(cost)}
+          </button>
         )}
       </div>
     </motion.li>
@@ -250,5 +388,41 @@ function LockShape() {
         />
       </svg>
     </div>
+  );
+}
+
+function PotionSvg({ tier }: { tier: number }) {
+  const fills = ['#A8D8B9', '#A8C5FF', '#D1C4E9', '#FFE082'];
+  const bodyFill = fills[tier - 1] ?? '#A8D8B9';
+  const accent = ['#7BA67C', '#6F8FD9', '#9B6DD7', '#E5B83A'][tier - 1] ?? '#7BA67C';
+  const sparkleCount = tier;
+  return (
+    <svg width="46" height="56" viewBox="0 0 46 56" aria-hidden="true">
+      {/* Stopper */}
+      <rect x="18" y="2" width="10" height="6" rx="1.6" fill="#7d5a44" />
+      <rect x="16" y="6" width="14" height="4" rx="1" fill="#a07a5c" />
+      {/* Neck */}
+      <rect x="20" y="10" width="6" height="8" fill="#dfe7f0" />
+      {/* Body */}
+      <path
+        d="M14 18 Q 12 22 12 28 Q 12 50 23 52 Q 34 50 34 28 Q 34 22 32 18 Z"
+        fill={bodyFill}
+        stroke={accent}
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+      />
+      {/* Highlight */}
+      <ellipse cx="18" cy="28" rx="2.2" ry="6" fill="white" opacity="0.5" />
+      {/* Sparkles */}
+      {Array.from({ length: sparkleCount }, (_, i) => (
+        <g key={i} transform={`translate(${24 + i * 3} ${36 - i * 4})`}>
+          <path
+            d="M0 -3 L1 -1 L3 0 L1 1 L0 3 L-1 1 L-3 0 L-1 -1 Z"
+            fill="white"
+            opacity="0.9"
+          />
+        </g>
+      ))}
+    </svg>
   );
 }

@@ -12,6 +12,7 @@ import type { CatTypeId } from './catTypes';
 import { CAT_TYPE_ORDER } from './catTypes';
 import type { PlotState } from './plots';
 import { createDefaultPlots, MAX_PLOTS } from './plots';
+import type { SpeedUpgradeId } from './upgrades';
 
 export const SAVE_KEY = 'grow-a-cat:save:v1';
 export const CURRENT_SAVE_VERSION = 1;
@@ -32,7 +33,10 @@ export interface SaveData {
   };
   settings: {
     reducedMotion: boolean;
+    soundMuted: boolean;
   };
+  /** Permanent speed-upgrade purchases. */
+  purchasedUpgrades: SpeedUpgradeId[];
   lastTickAt: number;
 }
 
@@ -58,8 +62,8 @@ function emptyCatsSold(): Record<CatTypeId, number> {
 
 export function createInitialSave(now: number): SaveData {
   const inv = emptySeedInventory();
-  // Player starts with 3 Gräskatt seeds (Gräskatt is also infinite by spec).
-  inv.graskatt = 3;
+  // Gräskatt is infinite by spec — no prefill needed. Three free starter
+  // grass-cat seeds are available immediately via the infinite flag.
   return {
     version: CURRENT_SAVE_VERSION,
     coins: 10,
@@ -76,7 +80,9 @@ export function createInitialSave(now: number): SaveData {
     },
     settings: {
       reducedMotion: false,
+      soundMuted: false,
     },
+    purchasedUpgrades: [],
     lastTickAt: now,
   };
 }
@@ -142,7 +148,21 @@ function migrate(raw: unknown, now: number): SaveData {
   const lotteryRaw = r.lottery as
     | { lastFreeSpinAt?: unknown; spinsToday?: unknown; spinsTodayDate?: unknown }
     | undefined;
-  const settingsRaw = r.settings as { reducedMotion?: unknown } | undefined;
+  const settingsRaw = r.settings as
+    | { reducedMotion?: unknown; soundMuted?: unknown }
+    | undefined;
+
+  const validUpgradeIds = new Set<string>([
+    'speed_1',
+    'speed_2',
+    'speed_3',
+    'speed_4',
+  ]);
+  const purchasedUpgrades: SpeedUpgradeId[] = Array.isArray(r.purchasedUpgrades)
+    ? (r.purchasedUpgrades.filter(
+        (v) => typeof v === 'string' && validUpgradeIds.has(v),
+      ) as SpeedUpgradeId[])
+    : [];
 
   return {
     version: CURRENT_SAVE_VERSION,
@@ -178,7 +198,9 @@ function migrate(raw: unknown, now: number): SaveData {
     },
     settings: {
       reducedMotion: Boolean(settingsRaw?.reducedMotion),
+      soundMuted: Boolean(settingsRaw?.soundMuted),
     },
+    purchasedUpgrades,
     lastTickAt: typeof r.lastTickAt === 'number' ? r.lastTickAt : now,
   };
 }

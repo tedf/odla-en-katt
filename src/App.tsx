@@ -3,7 +3,7 @@
  * plus mobile bottom-nav and global effects.
  */
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { HUD } from './components/HUD/HUD';
 import { Garden } from './components/Garden/Garden';
 import { Shop } from './components/Shop/Shop';
@@ -12,7 +12,9 @@ import { CatDisplay } from './components/CatDisplay/CatDisplay';
 import { Toasts } from './components/effects/Toasts';
 import { LightningFlash } from './components/effects/LightningFlash';
 import { RecapModal } from './components/effects/RecapModal';
+import { FloatingCoins } from './components/effects/FloatingCoins';
 import { useGameTick } from './hooks/useGameTick';
+import { useSoundEffects } from './hooks/useSoundEffects';
 import { useGameStore } from './store/useGameStore';
 import './App.css';
 import './components/CatDisplay/cat-sprite.css';
@@ -21,8 +23,12 @@ type MobileTab = 'garden' | 'shop' | 'lottery' | 'stall';
 
 function App() {
   useGameTick();
+  useGlobalSoundEffects();
   const reducedMotion = useGameStore((s) => s.settings.reducedMotion);
+  const soundMuted = useGameStore((s) => s.settings.soundMuted);
   const toggleReducedMotion = useGameStore((s) => s.toggleReducedMotion);
+  const toggleSoundMuted = useGameStore((s) => s.toggleSoundMuted);
+  const { playButton } = useSoundEffects();
   const [tab, setTab] = useState<MobileTab>('garden');
 
   return (
@@ -45,15 +51,30 @@ function App() {
             <span className="app-branding-sub">en mysig kattträdgård</span>
           </div>
         </div>
-        <button
-          type="button"
-          className="reduced-motion-toggle"
-          onClick={toggleReducedMotion}
-          aria-pressed={reducedMotion}
-          title={reducedMotion ? 'Slå på animationer' : 'Stäng av animationer'}
-        >
-          {reducedMotion ? 'Animationer av' : 'Animationer på'}
-        </button>
+        <div className="app-header-actions">
+          <button
+            type="button"
+            className="icon-toggle sound-toggle"
+            onClick={() => {
+              if (soundMuted) playButton();
+              toggleSoundMuted();
+            }}
+            aria-pressed={!soundMuted}
+            aria-label={soundMuted ? 'Slå på ljud' : 'Stäng av ljud'}
+            title={soundMuted ? 'Slå på ljud' : 'Stäng av ljud'}
+          >
+            {soundMuted ? <SpeakerMutedIcon /> : <SpeakerOnIcon />}
+          </button>
+          <button
+            type="button"
+            className="reduced-motion-toggle"
+            onClick={toggleReducedMotion}
+            aria-pressed={reducedMotion}
+            title={reducedMotion ? 'Slå på animationer' : 'Stäng av animationer'}
+          >
+            {reducedMotion ? 'Animationer av' : 'Animationer på'}
+          </button>
+        </div>
       </header>
 
       <main className="app-main">
@@ -98,10 +119,48 @@ function App() {
       </nav>
 
       <Toasts />
+      <FloatingCoins />
       <LightningFlash />
       <RecapModal />
     </div>
   );
+}
+
+/**
+ * Observes a few store fields and plays sound effects in response.
+ * Kept in App so any visible component can be silent while a single
+ * place owns "what does X event sound like".
+ */
+function useGlobalSoundEffects(): void {
+  const { playLightning, playUnlockPlot, playCoinEarn } = useSoundEffects();
+  const stormPlot = useGameStore((s) => s.activeStormPlot);
+  const coinPulseKey = useGameStore((s) => s.coinPulseKey);
+  const unlockedTypes = useGameStore((s) => s.unlockedCatTypes);
+
+  const lastStormRef = useRef<number | null>(null);
+  const lastCoinKeyRef = useRef<number>(coinPulseKey);
+  const lastUnlockCountRef = useRef<number>(unlockedTypes.length);
+
+  useEffect(() => {
+    if (stormPlot !== null && stormPlot !== lastStormRef.current) {
+      playLightning();
+    }
+    lastStormRef.current = stormPlot;
+  }, [stormPlot, playLightning]);
+
+  useEffect(() => {
+    if (coinPulseKey !== lastCoinKeyRef.current && coinPulseKey > 0) {
+      playCoinEarn();
+    }
+    lastCoinKeyRef.current = coinPulseKey;
+  }, [coinPulseKey, playCoinEarn]);
+
+  useEffect(() => {
+    if (unlockedTypes.length > lastUnlockCountRef.current) {
+      playUnlockPlot();
+    }
+    lastUnlockCountRef.current = unlockedTypes.length;
+  }, [unlockedTypes.length, playUnlockPlot]);
 }
 
 function Logo() {
@@ -120,6 +179,44 @@ function Logo() {
         strokeLinecap="round"
       />
       <path d="M15.4 20 Q 16 21 16.6 20" fill="#FF8FA3" />
+    </svg>
+  );
+}
+
+function SpeakerOnIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        d="M4 9v6h4l5 4V5L8 9H4z"
+        fill="currentColor"
+        opacity="0.85"
+      />
+      <path
+        d="M16 8c1.5 1.2 2.5 2.5 2.5 4s-1 2.8-2.5 4M18.5 5.5c2.7 1.6 4.5 3.8 4.5 6.5s-1.8 4.9-4.5 6.5"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        fill="none"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function SpeakerMutedIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        d="M4 9v6h4l5 4V5L8 9H4z"
+        fill="currentColor"
+        opacity="0.85"
+      />
+      <path
+        d="M16 9l6 6M22 9l-6 6"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        fill="none"
+      />
     </svg>
   );
 }

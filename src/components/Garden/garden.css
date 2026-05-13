@@ -14,6 +14,20 @@
   gap: var(--space-sm);
 }
 
+.garden-speed-chip {
+  margin-left: 8px;
+  background: linear-gradient(135deg, #a78bfa, #6f8fd9);
+  color: white;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.72rem;
+  padding: 3px 9px 4px;
+  border-radius: var(--radius-pill);
+  letter-spacing: 0.02em;
+  box-shadow: 0 2px 0 rgba(58, 45, 79, 0.25);
+  vertical-align: middle;
+}
+
 .garden-harvest-all {
   background: var(--color-primary);
   color: white;
@@ -37,8 +51,15 @@
 
 .garden-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-md);
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: var(--space-sm);
+}
+
+@media (min-width: 420px) {
+  .garden-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-md);
+  }
 }
 
 @media (min-width: 600px) {
@@ -181,12 +202,15 @@
 }
 
 .plot-locked .lock-icon {
-  width: 36px;
-  height: 36px;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.7);
+  background: white;
   display: grid;
   place-items: center;
+  box-shadow:
+    0 0 0 3px rgba(255, 255, 255, 0.55),
+    0 4px 10px -2px rgba(58, 45, 79, 0.35);
 }
 
 .plot-locked-threshold {
@@ -310,6 +334,127 @@
   gap: 2px;
 }
 
+.plot-speed-badge {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 3;
+  background: linear-gradient(135deg, #a78bfa, #6f8fd9);
+  color: white;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.68rem;
+  padding: 3px 8px 4px;
+  border-radius: var(--radius-pill);
+  box-shadow: 0 2px 0 rgba(58, 45, 79, 0.25);
+  letter-spacing: 0.02em;
+}
+
+/* Decorative swaying grass tufts on empty plots */
+.plot-grass-tufts {
+  position: absolute;
+  inset: auto 12px 8px 12px;
+  height: 18px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.plot-grass-tufts .tuft {
+  position: absolute;
+  bottom: 0;
+  width: 14px;
+  height: 18px;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    var(--color-grass) 60%,
+    var(--color-grass-shadow) 100%
+  );
+  clip-path: polygon(50% 0, 12% 100%, 88% 100%);
+  transform-origin: 50% 100%;
+  animation: grass-sway 4s ease-in-out infinite;
+  opacity: 0.78;
+}
+
+.plot-grass-tufts .tuft-1 {
+  left: 10%;
+  animation-delay: -0.4s;
+}
+.plot-grass-tufts .tuft-2 {
+  left: 45%;
+  animation-delay: -1.6s;
+  height: 22px;
+}
+.plot-grass-tufts .tuft-3 {
+  right: 12%;
+  animation-delay: -2.8s;
+}
+
+@keyframes grass-sway {
+  0%,
+  100% {
+    transform: rotate(-6deg);
+  }
+  50% {
+    transform: rotate(6deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .plot-grass-tufts .tuft {
+    animation: none;
+  }
+}
+
+/* Onboarding speech bubble pointing at plot 0 */
+.plot-onboarding-bubble {
+  position: absolute;
+  margin-top: -10px;
+  background: white;
+  color: var(--color-text);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.78rem;
+  padding: 8px 12px 10px;
+  border-radius: var(--radius-md);
+  box-shadow:
+    0 4px 0 rgba(255, 143, 163, 0.4),
+    0 12px 24px -8px rgba(58, 45, 79, 0.35);
+  pointer-events: none;
+  z-index: 5;
+  white-space: nowrap;
+  animation: onboard-bob 2.2s ease-in-out infinite;
+  border: 2px solid var(--color-primary);
+}
+
+.plot-onboarding-bubble .bubble-tail {
+  position: absolute;
+  bottom: -10px;
+  left: 24px;
+  width: 16px;
+  height: 12px;
+  background: white;
+  clip-path: polygon(0 0, 100% 0, 50% 100%);
+  border-right: 2px solid var(--color-primary);
+  border-bottom: 2px solid var(--color-primary);
+}
+
+@keyframes onboard-bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .plot-onboarding-bubble {
+    animation: none;
+  }
+}
+
 .plot-storm-cloud {
   position: absolute;
   top: -10px;
@@ -416,6 +561,19 @@
 .seed-row:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.seed-row.is-locked .seed-row-name,
+.seed-row.is-locked .seed-row-meta {
+  color: var(--color-text-mute);
+  font-style: italic;
+}
+
+.seed-row-locked-sprite {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
 }
 
 .seed-row-name {

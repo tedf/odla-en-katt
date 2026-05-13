@@ -66,8 +66,13 @@ export function shouldPlotBeUnlocked(
 
 /**
  * Returns elapsed growth ratio in [0, 1]. 0 if not growing.
+ * `speedMultiplier` (default 1) accelerates virtual elapsed time.
  */
-export function growthProgress(plot: PlotState, now: number): number {
+export function growthProgress(
+  plot: PlotState,
+  now: number,
+  speedMultiplier: number = 1,
+): number {
   if (
     plot.state !== 'growing' ||
     plot.catType === null ||
@@ -76,7 +81,7 @@ export function growthProgress(plot: PlotState, now: number): number {
     return plot.state === 'ready' ? 1 : 0;
   }
   const cat = CAT_TYPES[plot.catType];
-  const elapsed = now - plot.plantedAt;
+  const elapsed = (now - plot.plantedAt) * Math.max(0.0001, speedMultiplier);
   if (elapsed <= 0) return 0;
   if (elapsed >= cat.growMs) return 1;
   return elapsed / cat.growMs;
@@ -92,9 +97,14 @@ export function growthStage(progress: number): 0 | 1 | 2 {
 }
 
 /**
- * Returns time remaining in ms (clamped to >= 0).
+ * Returns wall-clock time remaining in ms (clamped to >= 0).
+ * `speedMultiplier` (default 1) shortens the perceived remaining time.
  */
-export function timeRemaining(plot: PlotState, now: number): number {
+export function timeRemaining(
+  plot: PlotState,
+  now: number,
+  speedMultiplier: number = 1,
+): number {
   if (
     plot.state !== 'growing' ||
     plot.catType === null ||
@@ -102,13 +112,20 @@ export function timeRemaining(plot: PlotState, now: number): number {
   )
     return 0;
   const cat = CAT_TYPES[plot.catType];
-  return Math.max(0, plot.plantedAt + cat.growMs - now);
+  const mult = Math.max(0.0001, speedMultiplier);
+  const effectiveGrowMs = cat.growMs / mult;
+  return Math.max(0, plot.plantedAt + effectiveGrowMs - now);
 }
 
 /**
  * Returns true if a growing plot has reached maturity (state should flip to ready).
+ * `speedMultiplier` accelerates ripening.
  */
-export function isMature(plot: PlotState, now: number): boolean {
+export function isMature(
+  plot: PlotState,
+  now: number,
+  speedMultiplier: number = 1,
+): boolean {
   if (
     plot.state !== 'growing' ||
     plot.catType === null ||
@@ -116,7 +133,8 @@ export function isMature(plot: PlotState, now: number): boolean {
   )
     return false;
   const cat = CAT_TYPES[plot.catType];
-  return now - plot.plantedAt >= cat.growMs;
+  const mult = Math.max(0.0001, speedMultiplier);
+  return (now - plot.plantedAt) * mult >= cat.growMs;
 }
 
 /**

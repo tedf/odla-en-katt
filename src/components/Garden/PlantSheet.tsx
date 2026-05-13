@@ -56,19 +56,29 @@ export function PlantSheet({ onClose, onPlant }: PlantSheetProps) {
               <li key={id}>
                 <button
                   type="button"
-                  className="seed-row"
+                  className={`seed-row${isUnlocked ? '' : ' is-locked'}`}
                   disabled={!canPlant}
                   onClick={() => canPlant && onPlant(id)}
                 >
-                  <CatSprite catType={id} size={48} stage={2} wiggle={false} />
+                  {isUnlocked ? (
+                    <CatSprite catType={id} size={48} stage={2} wiggle={false} />
+                  ) : (
+                    <div className="seed-row-locked-sprite" aria-hidden="true">
+                      <LockedSilhouette />
+                    </div>
+                  )}
                   <div>
-                    <div className="seed-row-name">{cat.name}</div>
+                    <div className="seed-row-name">
+                      {isUnlocked ? cat.name : '???'}
+                    </div>
                     <div className="seed-row-meta num">
-                      Växer {formatRemaining(cat.growMs)} · ger {cat.sellValue} mynt
+                      {isUnlocked
+                        ? `Växer ${formatRemaining(cat.growMs)} · ger ${cat.sellValue} mynt`
+                        : 'Lås upp i butiken'}
                     </div>
                   </div>
                   <div className="seed-row-count num">
-                    {cat.infinite ? '∞' : `× ${have}`}
+                    {isUnlocked ? (cat.infinite ? '∞' : `× ${have}`) : '—'}
                   </div>
                 </button>
               </li>
@@ -80,5 +90,22 @@ export function PlantSheet({ onClose, onPlant }: PlantSheetProps) {
         </button>
       </motion.div>
     </motion.div>
+  );
+}
+
+function LockedSilhouette() {
+  return (
+    <svg width="40" height="40" viewBox="0 0 40 40" aria-hidden="true">
+      <circle cx="20" cy="22" r="14" fill="#d6cde0" />
+      <path d="M10 14 L13 6 L17 13 Z" fill="#d6cde0" />
+      <path d="M30 14 L27 6 L23 13 Z" fill="#d6cde0" />
+      <rect x="13" y="22" width="14" height="9" rx="2" fill="white" />
+      <path
+        d="M16 22V19a4 4 0 018 0v3"
+        stroke="#9A8EB0"
+        strokeWidth="1.8"
+        fill="none"
+      />
+    </svg>
   );
 }

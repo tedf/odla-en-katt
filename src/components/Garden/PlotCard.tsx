@@ -13,8 +13,10 @@ import {
   timeRemaining,
   type PlotState,
 } from '../../domain/plots';
+import { activeSpeedMultiplier } from '../../domain/upgrades';
 import { formatRemaining, formatCoins } from '../../domain/time';
 import { useGameStore } from '../../store/useGameStore';
+import { useSoundEffects } from '../../hooks/useSoundEffects';
 import { CatSprite } from '../CatDisplay/CatSprite';
 import { PlantSheet } from './PlantSheet';
 
@@ -28,6 +30,10 @@ export function PlotCard({ plot }: PlotCardProps) {
   const activeStormPlot = useGameStore((s) => s.activeStormPlot);
   const plantSeed = useGameStore((s) => s.plantSeed);
   const harvestCat = useGameStore((s) => s.harvestCat);
+  const totalEarned = useGameStore((s) => s.totalEarned);
+  const purchasedUpgrades = useGameStore((s) => s.purchasedUpgrades);
+  const speedMult = activeSpeedMultiplier(purchasedUpgrades);
+  const { playPlant, playHarvest } = useSoundEffects();
 
   useEffect(() => {
     if (plot.state !== 'growing') return;
@@ -38,7 +44,10 @@ export function PlotCard({ plot }: PlotCardProps) {
   const handleClick = () => {
     if (!plot.unlocked) return;
     if (plot.state === 'empty') setShowSheet(true);
-    else if (plot.state === 'ready') harvestCat(plot.index);
+    else if (plot.state === 'ready') {
+      const ok = harvestCat(plot.index);
+      if (ok) playHarvest();
+    }
   };
 
   if (!plot.unlocked) {
@@ -47,6 +56,11 @@ export function PlotCard({ plot }: PlotCardProps) {
 
   const classes = ['plot-card'];
   if (plot.state === 'ready') classes.push('is-ready');
+  if (plot.state === 'empty') classes.push('is-empty');
+
+  // First-time onboarding tooltip for plot 0 when the player has no money.
+  const showOnboardTooltip =
+    plot.index === 0 && plot.state === 'empty' && totalEarned === 0;
 
   return (
     <>
@@ -54,7 +68,7 @@ export function PlotCard({ plot }: PlotCardProps) {
         type="button"
         className={classes.join(' ')}
         onClick={handleClick}
-        aria-label={ariaLabelFor(plot, now)}
+        aria-label={ariaLabelFor(plot, now, speedMult)}
         data-state={plot.state}
       >
         {plot.lightningBonus > 0 && (
@@ -63,6 +77,15 @@ export function PlotCard({ plot }: PlotCardProps) {
             title={`Blixtbonus: +${Math.round(plot.lightningBonus * 100)}%`}
           >
             <BoltSvg /> +{Math.round(plot.lightningBonus * 100)}%
+          </span>
+        )}
+
+        {speedMult > 1 && plot.state === 'growing' && (
+          <span
+            className="plot-speed-badge"
+            title={`Hastighet: ${speedMult}x`}
+          >
+            ⚡{speedMult}x
           </span>
         )}
 
@@ -81,14 +104,34 @@ export function PlotCard({ plot }: PlotCardProps) {
           )}
 
           {plot.state === 'growing' && plot.catType !== null && (
-            <GrowingStage catType={plot.catType} now={now} plot={plot} />
+            <GrowingStage
+              catType={plot.catType}
+              now={now}
+              plot={plot}
+              speedMult={speedMult}
+            />
           )}
 
           {plot.state === 'ready' && plot.catType !== null && (
             <ReadyStage catType={plot.catType} plot={plot} />
           )}
         </div>
+
+        {plot.state === 'empty' && (
+          <span className="plot-grass-tufts" aria-hidden="true">
+            <span className="tuft tuft-1" />
+            <span className="tuft tuft-2" />
+            <span className="tuft tuft-3" />
+          </span>
+        )}
       </button>
+
+      {showOnboardTooltip && (
+        <div className="plot-onboarding-bubble" role="note">
+          <span>Klicka för att plantera en Gräskatt!</span>
+          <span className="bubble-tail" aria-hidden="true" />
+        </div>
+      )}
 
       <AnimatePresence>
         {showSheet && (
@@ -96,7 +139,10 @@ export function PlotCard({ plot }: PlotCardProps) {
             onClose={() => setShowSheet(false)}
             onPlant={(catType: CatTypeId) => {
               const ok = plantSeed(plot.index, catType);
-              if (ok) setShowSheet(false);
+              if (ok) {
+                playPlant();
+                setShowSheet(false);
+              }
             }}
           />
         )}
@@ -109,15 +155,17 @@ function GrowingStage({
   catType,
   now,
   plot,
+  speedMult,
 }: {
   catType: CatTypeId;
   now: number;
   plot: PlotState;
+  speedMult: number;
 }) {
   const cat = CAT_TYPES[catType];
-  const progress = growthProgress(plot, now);
+  const progress = growthProgress(plot, now, speedMult);
   const stage = growthStage(progress);
-  const remaining = timeRemaining(plot, now);
+  const remaining = timeRemaining(plot, now, speedMult);
 
   const barStyle: React.CSSProperties = {
     ['--bar-from' as string]: cat.palette.body,
@@ -178,13 +226,13 @@ function LockedPlotCard({ index }: { index: number }) {
   );
 }
 
-function ariaLabelFor(plot: PlotState, now: number): string {
+function ariaLabelFor(plot: PlotState, now: number, speedMult: number): string {
   if (plot.state === 'empty')
     return `Plot ${plot.index + 1}: tom. Klicka för att plantera.`;
   if (plot.state === 'growing' && plot.catType) {
     const cat = CAT_TYPES[plot.catType];
     return `Plot ${plot.index + 1}: ${cat.name} växer, ${formatRemaining(
-      timeRemaining(plot, now),
+      timeRemaining(plot, now, speedMult),
     )} kvar.`;
   }
   if (plot.state === 'ready' && plot.catType) {
@@ -210,7 +258,7 @@ function BoltSvg() {
 
 function LockSvg() {
   return (
-    <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
+    <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true">
       <rect
         x="5"
         y="11"
@@ -218,16 +266,16 @@ function LockSvg() {
         height="10"
         rx="2"
         fill="#fff"
-        stroke="#9A8EB0"
-        strokeWidth="1.5"
+        stroke="#5b4a7c"
+        strokeWidth="1.8"
       />
       <path
         d="M8 11V8a4 4 0 018 0v3"
-        stroke="#9A8EB0"
-        strokeWidth="1.6"
+        stroke="#5b4a7c"
+        strokeWidth="2"
         fill="none"
       />
-      <circle cx="12" cy="16" r="1.4" fill="#9A8EB0" />
+      <circle cx="12" cy="16" r="1.6" fill="#5b4a7c" />
     </svg>
   );
 }

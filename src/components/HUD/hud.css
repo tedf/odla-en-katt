@@ -58,6 +58,22 @@
 .hud-coins-sub {
   grid-column: 2 / 3;
   font-size: var(--text-micro);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.hud-speed-chip {
+  background: linear-gradient(135deg, #a78bfa, #6f8fd9);
+  color: white;
+  font-family: var(--font-display);
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  font-size: 0.66rem;
+  letter-spacing: 0.04em;
+  box-shadow: 0 2px 0 rgba(58, 45, 79, 0.2);
 }
 
 .hud-hint {

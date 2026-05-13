@@ -13,13 +13,16 @@ export interface OfflineRecap {
 
 /**
  * Walks plots and marks those whose grow time has elapsed as 'ready'.
+ * `speedMultiplier` accelerates virtual elapsed time during offline catchup.
  * Returns the new plots array plus a recap summary.
  */
 export function applyOfflineCatchup(
   plots: PlotState[],
   now: number,
   awayMs: number,
+  speedMultiplier: number = 1,
 ): { plots: PlotState[]; recap: OfflineRecap } {
+  const mult = Math.max(0.0001, speedMultiplier);
   const readyPlots: number[] = [];
   const nextPlots = plots.map((plot) => {
     if (
@@ -28,7 +31,7 @@ export function applyOfflineCatchup(
       plot.plantedAt !== null
     ) {
       const cat = CAT_TYPES[plot.catType];
-      if (now - plot.plantedAt >= cat.growMs) {
+      if ((now - plot.plantedAt) * mult >= cat.growMs) {
         readyPlots.push(plot.index);
         return { ...plot, state: 'ready' as const };
       }

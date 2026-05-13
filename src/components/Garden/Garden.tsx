@@ -3,23 +3,36 @@
  */
 
 import { useGameStore } from '../../store/useGameStore';
+import { useSoundEffects } from '../../hooks/useSoundEffects';
+import { activeSpeedMultiplier } from '../../domain/upgrades';
 import { PlotCard } from './PlotCard';
 import './garden.css';
 
 export function Garden() {
   const plots = useGameStore((s) => s.plots);
+  const purchasedUpgrades = useGameStore((s) => s.purchasedUpgrades);
+  const speedMult = activeSpeedMultiplier(purchasedUpgrades);
   const readyCount = plots.filter((p) => p.state === 'ready').length;
+  const { playHarvest } = useSoundEffects();
 
   return (
     <section className="section-card garden-section" aria-label="Trädgården">
       <header className="garden-header">
         <h2>
           <LeafIcon /> Trädgården
+          {speedMult > 1 && (
+            <span className="garden-speed-chip" title={`Hastighet: ${speedMult}x`}>
+              ⚡{speedMult}x
+            </span>
+          )}
         </h2>
         {readyCount > 0 && (
           <button
             className="garden-harvest-all"
-            onClick={() => useGameStore.getState().harvestAllReady()}
+            onClick={() => {
+              useGameStore.getState().harvestAllReady();
+              playHarvest();
+            }}
             type="button"
           >
             Skörda alla ({readyCount})

@@ -83,13 +83,19 @@
 
 .app-main {
   flex: 1;
-  padding: var(--space-md) clamp(1rem, 4vw, 3rem) var(--space-xl);
+  padding: var(--space-md) clamp(0.5rem, 3vw, 3rem) var(--space-xl);
   max-width: 1320px;
   width: 100%;
   margin: 0 auto;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: var(--space-lg);
+}
+
+@media (max-width: 420px) {
+  .section-card {
+    padding: var(--space-md);
+  }
 }
 
 @media (min-width: 1080px) {
@@ -158,12 +164,19 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: var(--space-md) clamp(1rem, 4vw, 3rem) 0;
+  padding: var(--space-md) clamp(0.5rem, 3vw, 3rem) 0;
   max-width: 1320px;
   width: 100%;
   margin: 0 auto;
-  gap: var(--space-md);
+  gap: var(--space-sm);
   flex-wrap: wrap;
+  row-gap: 8px;
+}
+
+.app-header-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
 }
 
 .app-branding {
@@ -233,6 +246,34 @@
   color: var(--color-primary-deep);
 }
 
+.icon-toggle {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: rgba(58, 45, 79, 0.06);
+  color: var(--color-text-soft);
+  display: grid;
+  place-items: center;
+  transition: all var(--duration-fast) var(--ease-out-expo);
+}
+
+.icon-toggle:hover {
+  background: rgba(58, 45, 79, 0.12);
+  color: var(--color-text);
+}
+
+.sound-toggle[aria-pressed='true'] {
+  background: var(--color-primary-soft);
+  color: var(--color-primary-deep);
+}
+
+@media (max-width: 420px) {
+  .reduced-motion-toggle {
+    font-size: 0.65rem;
+    padding: 6px 10px;
+  }
+}
+
 .section-card h2 {
   font-size: var(--text-section);
   font-weight: 700;
@@ -291,6 +332,43 @@
   color: var(--color-text-soft);
   font-size: var(--text-micro);
   margin-top: 2px;
+}
+
+/* Floating coin numbers that pop up after a harvest */
+.floating-coins-layer {
+  position: fixed;
+  top: 64px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 90;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 0;
+  height: 0;
+}
+
+.floating-coin {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  transform: translateX(calc(-50% + var(--coin-offset, 0px)));
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 4px 12px 5px;
+  border-radius: var(--radius-pill);
+  background: linear-gradient(180deg, #fff8e3 0%, #ffe1a8 100%);
+  color: #6f4612;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1rem;
+  box-shadow:
+    0 2px 0 var(--color-coin-deep),
+    0 8px 18px -6px rgba(217, 152, 41, 0.6);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
 /* Lightning full-screen flash */

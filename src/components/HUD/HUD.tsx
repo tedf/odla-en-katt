@@ -8,6 +8,7 @@ import { useGameStore } from '../../store/useGameStore';
 import { nextPlotUnlock } from '../../domain/economy';
 import { formatCoins } from '../../domain/time';
 import { isFreeSpinAvailable } from '../../domain/lottery';
+import { activeSpeedMultiplier } from '../../domain/upgrades';
 import './hud.css';
 
 interface HUDProps {
@@ -20,19 +21,51 @@ export function HUD({ onOpenLottery, onOpenShop }: HUDProps) {
   const totalEarned = useGameStore((s) => s.totalEarned);
   const lottery = useGameStore((s) => s.lottery);
   const coinPulseKey = useGameStore((s) => s.coinPulseKey);
+  const purchasedUpgrades = useGameStore((s) => s.purchasedUpgrades);
+  const speedMult = activeSpeedMultiplier(purchasedUpgrades);
 
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
-    const id = window.setInterval(() => setNow(Date.now()), 30_000);
+    // Tight 5s interval so the free-spin pip lights up within seconds of
+    // midnight rollover and after a spin.
+    const id = window.setInterval(() => setNow(Date.now()), 5_000);
     return () => window.clearInterval(id);
   }, []);
 
   const freeSpin = isFreeSpinAvailable(lottery.lastFreeSpinAt, now);
   const nextUnlock = nextPlotUnlock(totalEarned);
 
+  // Shake the coin chip when the player tries to buy with 0 coins.
+  const [coinShake, setCoinShake] = useState(0);
+  useEffect(() => {
+    if (coins !== 0) return;
+    // Listen on the document for clicks on disabled-by-cost buttons.
+    const handler = (e: Event) => {
+      const target = e.target as HTMLElement | null;
+      if (!target) return;
+      if (
+        target instanceof HTMLButtonElement &&
+        target.disabled &&
+        (target.classList.contains('seed-card-buy') ||
+          target.classList.contains('upgrade-buy') ||
+          target.classList.contains('lottery-spin-btn'))
+      ) {
+        setCoinShake((s) => s + 1);
+      }
+    };
+    document.addEventListener('pointerdown', handler, true);
+    return () => document.removeEventListener('pointerdown', handler, true);
+  }, [coins]);
+
   return (
     <section className="hud" aria-label="Spelinformation">
-      <div className="hud-coins" aria-live="polite">
+      <motion.div
+        className="hud-coins"
+        aria-live="polite"
+        animate={coinShake > 0 ? { x: [0, -8, 8, -6, 6, 0] } : { x: 0 }}
+        transition={{ duration: 0.4 }}
+        key={`shake-${coinShake}`}
+      >
         <CoinIcon />
         <div className="hud-coins-meta">
           <span className="hud-coins-label">Mynt</span>
@@ -50,8 +83,13 @@ export function HUD({ onOpenLottery, onOpenShop }: HUDProps) {
         </div>
         <div className="hud-coins-sub muted num">
           Totalt intjänat: {formatCoins(totalEarned)}
+          {speedMult > 1 && (
+            <span className="hud-speed-chip" title={`Hastighet: ${speedMult}x`}>
+              ⚡{speedMult}x
+            </span>
+          )}
         </div>
-      </div>
+      </motion.div>
 
       {nextUnlock !== null && (
         <div className="hud-hint">

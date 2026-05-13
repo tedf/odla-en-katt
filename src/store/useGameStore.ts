@@ -38,6 +38,11 @@ import {
   type SaveData,
 } from '../domain/persistence';
 import { applyOfflineCatchup } from '../domain/time';
+import {
+  activeSpeedMultiplier,
+  getUpgradeById,
+  type SpeedUpgradeId,
+} from '../domain/upgrades';
 
 export interface ToastMessage {
   id: number;
@@ -55,7 +60,13 @@ export interface PendingRecap {
 
 export interface SpinResult {
   sectorIndex: number;
-  spinAngle: number; // total degrees the wheel should rotate
+  /**
+   * Deprecated: kept for back-compat. The LotteryWheel component now
+   * computes the visible rotation from `sectorIndex` so it can correctly
+   * align the winning sector under the pointer regardless of the wheel's
+   * previous resting position.
+   */
+  spinAngle: number;
 }
 
 interface FloatingCoin {
@@ -80,7 +91,9 @@ export interface GameState {
   };
   settings: {
     reducedMotion: boolean;
+    soundMuted: boolean;
   };
+  purchasedUpgrades: SpeedUpgradeId[];
   lastTickAt: number;
 
   // ---- ephemeral UI state ----
@@ -89,20 +102,29 @@ export interface GameState {
   pendingRecap: PendingRecap | null;
   activeStormPlot: number | null;
   lastSpin: SpinResult | null;
+  /** Bumps whenever a lottery spin starts (useful for sound triggers). */
+  lotterySpinKey: number;
+  /** Bumps when the lottery prize-modal opens. */
+  lotteryResultKey: number;
   coinPulseKey: number;
+  /** Pulses when the pointer should bounce after the wheel stops. */
+  pointerBounceKey: number;
 
   // ---- actions ----
   tick: () => void;
   plantSeed: (plotIndex: number, catType: CatTypeId) => boolean;
   harvestCat: (plotIndex: number) => boolean;
   buySeed: (catType: CatTypeId) => boolean;
+  buyUpgrade: (upgradeId: SpeedUpgradeId) => boolean;
   spinLottery: () => SpinResult | null;
   acknowledgeSpin: () => void;
   toggleReducedMotion: () => void;
+  toggleSoundMuted: () => void;
   dismissToast: (id: number) => void;
   dismissRecap: () => void;
   harvestAllReady: () => void;
   clearFloatingCoin: (id: number) => void;
+  notifyPointerBounce: () => void;
   forceSave: () => void;
 }
 
@@ -148,6 +170,7 @@ function persistFromState(state: GameState): void {
     lastStormAt: state.lastStormAt,
     lottery: state.lottery,
     settings: state.settings,
+    purchasedUpgrades: state.purchasedUpgrades,
     lastTickAt: state.lastTickAt,
   };
   writeSave(data);
@@ -159,13 +182,16 @@ type InitialStateFields = Omit<
   | 'plantSeed'
   | 'harvestCat'
   | 'buySeed'
+  | 'buyUpgrade'
   | 'spinLottery'
   | 'acknowledgeSpin'
   | 'toggleReducedMotion'
+  | 'toggleSoundMuted'
   | 'dismissToast'
   | 'dismissRecap'
   | 'harvestAllReady'
   | 'clearFloatingCoin'
+  | 'notifyPointerBounce'
   | 'forceSave'
 >;
 
@@ -183,12 +209,14 @@ function bootstrapInitialState(): InitialStateFields {
     return { ...p, unlocked: save.totalEarned >= threshold };
   });
 
-  // Offline catch-up
+  // Offline catch-up — speed multiplier compresses elapsed time.
+  const speedMult = activeSpeedMultiplier(save.purchasedUpgrades);
   const awayMs = Math.max(0, now - save.lastTickAt);
   const { plots: caughtUp, recap } = applyOfflineCatchup(
     unlockedPlots,
     now,
     awayMs,
+    speedMult,
   );
 
   const pendingRecap: PendingRecap | null =
@@ -206,13 +234,17 @@ function bootstrapInitialState(): InitialStateFields {
     lastStormAt: save.lastStormAt,
     lottery: save.lottery,
     settings: save.settings,
+    purchasedUpgrades: save.purchasedUpgrades,
     lastTickAt: now,
     toasts: [],
     floatingCoins: [],
     pendingRecap,
     activeStormPlot: null,
     lastSpin: null,
+    lotterySpinKey: 0,
+    lotteryResultKey: 0,
     coinPulseKey: 0,
+    pointerBounceKey: 0,
   };
 }
 
@@ -222,6 +254,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   tick: () => {
     const state = get();
     const now = nowMs();
+    const speedMult = activeSpeedMultiplier(state.purchasedUpgrades);
 
     let plots = state.plots;
     let lastStormAt = state.lastStormAt;
@@ -229,9 +262,9 @@ export const useGameStore = create<GameState>((set, get) => ({
     let toasts = state.toasts;
     let changed = false;
 
-    // 1. Mature growing plots into ready.
+    // 1. Mature growing plots into ready (speed multiplier accelerates ripening).
     plots = plots.map((p) => {
-      if (isMature(p, now)) {
+      if (isMature(p, now, speedMult)) {
         changed = true;
         return markReady(p);
       }
@@ -429,6 +462,27 @@ export const useGameStore = create<GameState>((set, get) => ({
     return true;
   },
 
+  buyUpgrade: (upgradeId) => {
+    const state = get();
+    const upgrade = getUpgradeById(upgradeId);
+    if (!upgrade) return false;
+    if (state.purchasedUpgrades.includes(upgradeId)) return false;
+    if (state.coins < upgrade.cost) return false;
+
+    set({
+      coins: state.coins - upgrade.cost,
+      purchasedUpgrades: [...state.purchasedUpgrades, upgradeId],
+      toasts: pushToast(
+        state.toasts,
+        'success',
+        `${upgrade.name} aktiverad!`,
+        `Odlingen är nu ${upgrade.multiplier}x snabbare`,
+      ),
+    });
+    persistFromState(get());
+    return true;
+  },
+
   spinLottery: () => {
     const state = get();
     const now = nowMs();
@@ -495,12 +549,12 @@ export const useGameStore = create<GameState>((set, get) => ({
       );
     }
 
-    // Spin angle: 8 sectors, sector 0 starts at top. Each is 45deg.
-    // Pointer at top (12 o'clock). Wheel rotates clockwise.
+    // spinAngle is informational only; the LotteryWheel component computes
+    // its own delta from the current rotation so it always lands precisely
+    // under the pointer (see component for the geometry comment).
     const sectorAngle = 360 / LOTTERY_SECTORS.length;
     const sectorCenter = sectorIndex * sectorAngle + sectorAngle / 2;
-    const extraSpins = 4;
-    const spinAngle = extraSpins * 360 + (360 - sectorCenter);
+    const spinAngle = 5 * 360 + ((360 - sectorCenter) % 360);
 
     const result: SpinResult = { sectorIndex, spinAngle };
 
@@ -517,6 +571,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       },
       toasts,
       lastSpin: result,
+      lotterySpinKey: state.lotterySpinKey + 1,
       coinPulseKey:
         prize.kind === 'coins' ? state.coinPulseKey + 1 : state.coinPulseKey,
     });
@@ -526,10 +581,21 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   acknowledgeSpin: () => set({ lastSpin: null }),
 
+  notifyPointerBounce: () =>
+    set({ pointerBounceKey: get().pointerBounceKey + 1 }),
+
   toggleReducedMotion: () => {
     const s = get();
     set({
       settings: { ...s.settings, reducedMotion: !s.settings.reducedMotion },
+    });
+    persistFromState(get());
+  },
+
+  toggleSoundMuted: () => {
+    const s = get();
+    set({
+      settings: { ...s.settings, soundMuted: !s.settings.soundMuted },
     });
     persistFromState(get());
   },
