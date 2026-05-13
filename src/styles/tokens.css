@@ -1,0 +1,102 @@
+/* Design tokens — single source of truth for palette, spacing, type, motion. */
+
+:root {
+  /* ---- Palette ---- */
+  --color-sky-top: #fff4e6;
+  --color-sky-bottom: #f3dff2;
+  --color-mist: #e8d5f2;
+  --color-grass: #a8d8b9;
+  --color-grass-shadow: #7ba67c;
+  --color-soil: #b08568;
+  --color-soil-deep: #7d5a44;
+  --color-soil-lip: #d5b395;
+
+  --color-primary: #ff8fa3;
+  --color-primary-deep: #d96b7f;
+  --color-primary-soft: #ffd0db;
+  --color-secondary: #a8c5ff;
+  --color-secondary-deep: #6f8fd9;
+  --color-coin: #ffd56b;
+  --color-coin-deep: #e8a93c;
+
+  --color-text: #3a2d4f;
+  --color-text-soft: #6c5b8a;
+  --color-text-mute: #9a8eb0;
+  --color-surface: #ffffff;
+  --color-surface-warm: #fff9f0;
+  --color-surface-cool: #f4ecff;
+
+  --color-storm: #7e57c2;
+  --color-storm-flash: #ffeb3b;
+
+  --rarity-common: #c8e6c9;
+  --rarity-uncommon: #b3e5fc;
+  --rarity-rare: #d1c4e9;
+  --rarity-epic: #ffccbc;
+  --rarity-legendary: #ffe082;
+  --rarity-mythic: #f8bbd0;
+
+  /* ---- Spacing ---- */
+  --space-2xs: 0.25rem;
+  --space-xs: 0.5rem;
+  --space-sm: 0.75rem;
+  --space-md: 1rem;
+  --space-lg: 1.5rem;
+  --space-xl: 2rem;
+  --space-2xl: 3rem;
+  --space-section: clamp(2rem, 1.5rem + 2vw, 4rem);
+
+  /* ---- Type ---- */
+  --font-display:
+    'Fredoka', 'Quicksand', 'Nunito', system-ui, -apple-system, sans-serif;
+  --font-body: 'Nunito', 'Quicksand', system-ui, -apple-system, sans-serif;
+  --text-coin: clamp(1.75rem, 1.4rem + 1.5vw, 2.5rem);
+  --text-hero: clamp(2rem, 1.5rem + 2vw, 3.2rem);
+  --text-section: clamp(1.1rem, 1rem + 0.4vw, 1.4rem);
+  --text-base: 0.95rem;
+  --text-small: 0.825rem;
+  --text-micro: 0.7rem;
+
+  /* ---- Radii ---- */
+  --radius-xs: 6px;
+  --radius-sm: 10px;
+  --radius-md: 16px;
+  --radius-lg: 22px;
+  --radius-pill: 999px;
+
+  /* ---- Shadows (directional, varied) ---- */
+  --shadow-card:
+    0 6px 0 rgba(102, 71, 122, 0.12),
+    0 14px 24px -8px rgba(102, 71, 122, 0.22);
+  --shadow-plot:
+    inset 0 -8px 0 rgba(91, 64, 50, 0.18),
+    inset 0 2px 0 rgba(255, 255, 255, 0.4),
+    0 10px 18px -6px rgba(91, 64, 50, 0.28);
+  --shadow-button:
+    0 4px 0 var(--color-primary-deep),
+    0 8px 18px -4px rgba(217, 107, 127, 0.4);
+  --shadow-button-secondary:
+    0 4px 0 var(--color-secondary-deep),
+    0 8px 18px -4px rgba(111, 143, 217, 0.35);
+  --shadow-floating:
+    0 22px 50px -10px rgba(58, 45, 79, 0.35),
+    0 4px 0 rgba(58, 45, 79, 0.1);
+
+  /* ---- Motion ---- */
+  --duration-fast: 150ms;
+  --duration-normal: 280ms;
+  --duration-slow: 480ms;
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-back: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* ---- Effects ---- */
+  --grain-opacity: 0.04;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-fast: 0ms;
+    --duration-normal: 0ms;
+    --duration-slow: 0ms;
+  }
+}

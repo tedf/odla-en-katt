@@ -1,0 +1,222 @@
+.lottery {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.lottery-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.lottery-close {
+  font-size: 1.2rem;
+  color: var(--color-text-soft);
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(58, 45, 79, 0.08);
+}
+
+.lottery-sub {
+  margin-top: -4px;
+}
+
+.wheel-stage {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  max-width: 320px;
+  margin: var(--space-sm) auto;
+}
+
+.wheel {
+  position: absolute;
+  inset: 0;
+  filter: drop-shadow(0 12px 24px rgba(58, 45, 79, 0.25));
+}
+
+.wheel-pointer {
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  transform: translateX(-50%) rotate(180deg);
+  z-index: 4;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.25));
+}
+
+.wheel-hub {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 3;
+  background: white;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  box-shadow:
+    0 4px 0 var(--color-coin-deep),
+    0 0 0 4px var(--color-coin);
+}
+
+.lottery-spin-btn {
+  width: 100%;
+  padding: 14px 16px 16px;
+  border-radius: var(--radius-pill);
+  background: var(--color-primary);
+  color: white;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.05rem;
+  box-shadow: var(--shadow-button);
+  transition: transform var(--duration-fast) var(--ease-back);
+}
+
+.lottery-spin-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+}
+
+.lottery-spin-btn:active:not(:disabled) {
+  transform: translateY(2px);
+  box-shadow: 0 0 0 var(--color-primary-deep);
+}
+
+.lottery-spin-btn:disabled {
+  background: rgba(58, 45, 79, 0.12);
+  color: var(--color-text-mute);
+  box-shadow: none;
+}
+
+.lottery-stats {
+  display: flex;
+  justify-content: space-around;
+  gap: var(--space-sm);
+  font-size: var(--text-small);
+}
+
+.lottery-stats span {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1.2;
+}
+
+.lottery-stats strong {
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  color: var(--color-text);
+}
+
+.prize-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(58, 45, 79, 0.45);
+  backdrop-filter: blur(6px);
+  z-index: 1100;
+  display: grid;
+  place-items: center;
+  padding: var(--space-md);
+}
+
+.prize-modal {
+  background: white;
+  border-radius: var(--radius-lg);
+  padding: var(--space-xl);
+  text-align: center;
+  width: 100%;
+  max-width: 360px;
+  box-shadow: var(--shadow-floating);
+  position: relative;
+  overflow: visible;
+  border-top: 8px solid var(--prize-color, var(--color-primary));
+}
+
+.prize-modal h3 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: var(--color-text-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-bottom: var(--space-xs);
+}
+
+.prize-headline {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(1.6rem, 1.2rem + 2vw, 2.4rem);
+  color: var(--color-text);
+  margin-bottom: var(--space-md);
+}
+
+.prize-claim {
+  width: 100%;
+  padding: 12px 16px 14px;
+  border-radius: var(--radius-pill);
+  background: var(--color-primary);
+  color: white;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1rem;
+  box-shadow: var(--shadow-button);
+}
+
+.prize-claim:active {
+  transform: translateY(2px);
+  box-shadow: 0 0 0 var(--color-primary-deep);
+}
+
+.prize-confetti {
+  position: absolute;
+  inset: -20px;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.prize-confetti span {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 10px;
+  height: 14px;
+  background: var(--prize-color, var(--color-primary));
+  border-radius: 2px;
+  transform: translate(-50%, -50%);
+  animation: confetti-out 900ms var(--ease-out-expo) forwards;
+  animation-delay: calc(var(--i) * 30ms);
+}
+
+.prize-confetti span:nth-child(3n) {
+  background: var(--color-coin);
+}
+.prize-confetti span:nth-child(5n) {
+  background: var(--color-secondary);
+}
+
+@keyframes confetti-out {
+  0% {
+    transform: translate(-50%, -50%) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(
+        calc(-50% + (cos(calc(var(--i) * 20deg)) * 160px)),
+        calc(-50% + (sin(calc(var(--i) * 20deg)) * 160px))
+      )
+      rotate(360deg);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .prize-confetti span,
+  .wheel,
+  .prize-modal {
+    animation: none !important;
+    transition: none !important;
+  }
+}

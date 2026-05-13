@@ -1,0 +1,225 @@
+.shop-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-md);
+}
+
+.shop-balance {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--color-coin);
+  color: #6f4612;
+  padding: 6px 12px;
+  border-radius: var(--radius-pill);
+  font-family: var(--font-display);
+  font-weight: 700;
+  box-shadow: 0 3px 0 var(--color-coin-deep);
+}
+
+.shop-tabs {
+  display: flex;
+  gap: 4px;
+  background: rgba(58, 45, 79, 0.06);
+  padding: 4px;
+  border-radius: var(--radius-pill);
+  margin-bottom: var(--space-md);
+}
+
+.shop-tabs button {
+  flex: 1;
+  padding: 8px 12px;
+  border-radius: var(--radius-pill);
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--color-text-soft);
+  transition: all var(--duration-fast) var(--ease-out-expo);
+}
+
+.shop-tabs button.active {
+  background: white;
+  color: var(--color-text);
+  box-shadow: 0 2px 8px rgba(58, 45, 79, 0.15);
+}
+
+.shop-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 520px;
+  overflow-y: auto;
+}
+
+.seed-card {
+  display: grid;
+  grid-template-columns: 64px 1fr auto;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: 10px 12px;
+  background: var(--color-surface);
+  border-radius: var(--radius-md);
+  border-left: 5px solid var(--rarity-common);
+  position: relative;
+}
+
+.seed-card.rarity-uncommon {
+  border-left-color: var(--rarity-uncommon);
+}
+.seed-card.rarity-rare {
+  border-left-color: var(--rarity-rare);
+}
+.seed-card.rarity-epic {
+  border-left-color: var(--rarity-epic);
+}
+.seed-card.rarity-legendary {
+  border-left-color: var(--rarity-legendary);
+  background: linear-gradient(
+    90deg,
+    var(--color-surface),
+    rgba(255, 224, 130, 0.18)
+  );
+}
+.seed-card.rarity-mythic {
+  border-left-color: var(--rarity-mythic);
+  background: linear-gradient(
+    90deg,
+    var(--color-surface),
+    rgba(248, 187, 208, 0.22)
+  );
+}
+
+.seed-card.locked {
+  opacity: 0.65;
+}
+
+.seed-card-sprite {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+}
+
+.seed-card-body {
+  min-width: 0;
+}
+
+.seed-card-title {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.seed-card-name {
+  font-family: var(--font-display);
+  font-weight: 700;
+  color: var(--color-text);
+  font-size: 1rem;
+}
+
+.seed-card-rarity {
+  font-size: var(--text-micro);
+  color: var(--color-text-mute);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+}
+
+.seed-card-meta {
+  font-size: var(--text-micro);
+  color: var(--color-text-soft);
+  margin-top: 2px;
+}
+
+.seed-card-actions {
+  display: flex;
+  align-items: center;
+}
+
+.seed-card-buy {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 12px 10px;
+  border-radius: var(--radius-pill);
+  background: var(--color-primary);
+  color: white;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.85rem;
+  box-shadow: var(--shadow-button);
+  transition: transform var(--duration-fast) var(--ease-back);
+}
+
+.seed-card-buy:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.seed-card-buy:active:not(:disabled) {
+  transform: translateY(2px);
+  box-shadow: 0 0 0 var(--color-primary-deep);
+}
+
+.seed-card-buy:disabled {
+  background: rgba(58, 45, 79, 0.15);
+  color: var(--color-text-mute);
+  box-shadow: none;
+}
+
+.seed-card-tag {
+  font-size: var(--text-micro);
+  font-family: var(--font-display);
+  font-weight: 600;
+  padding: 6px 10px;
+  border-radius: var(--radius-pill);
+  background: var(--color-grass);
+  color: #2f4a36;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.locked-tag {
+  background: rgba(154, 142, 176, 0.18);
+  color: var(--color-text-soft);
+}
+
+.seed-locked-shape {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+}
+
+.shop-stall-row {
+  display: grid;
+  grid-template-columns: 48px 1fr auto;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: 8px 12px;
+  background: var(--color-surface);
+  border-radius: var(--radius-md);
+}
+
+.shop-stall-info {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+
+.shop-stall-name {
+  font-family: var(--font-display);
+  font-weight: 600;
+}
+
+.shop-stall-count {
+  font-family: var(--font-display);
+  font-weight: 700;
+  color: var(--color-primary-deep);
+}

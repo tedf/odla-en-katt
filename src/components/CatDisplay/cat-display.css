@@ -1,0 +1,144 @@
+.cat-display-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-md);
+  margin-bottom: var(--space-md);
+}
+
+.cat-display-stats {
+  display: flex;
+  gap: var(--space-md);
+  font-size: var(--text-small);
+}
+
+.cat-display-stats span {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  line-height: 1.2;
+}
+
+.cat-display-stats strong {
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  color: var(--color-text);
+}
+
+.cat-display-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  max-height: 460px;
+  overflow-y: auto;
+}
+
+.cat-row {
+  display: grid;
+  grid-template-columns: 56px 1fr auto;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: 6px 10px;
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  border-left: 5px solid var(--rarity-common);
+  transition: transform var(--duration-fast) var(--ease-out-expo);
+}
+
+.cat-row:hover {
+  transform: translateX(2px);
+}
+
+.cat-row.rarity-uncommon {
+  border-left-color: var(--rarity-uncommon);
+}
+.cat-row.rarity-rare {
+  border-left-color: var(--rarity-rare);
+}
+.cat-row.rarity-epic {
+  border-left-color: var(--rarity-epic);
+}
+.cat-row.rarity-legendary {
+  border-left-color: var(--rarity-legendary);
+  background: linear-gradient(
+    90deg,
+    var(--color-surface),
+    rgba(255, 224, 130, 0.18)
+  );
+}
+.cat-row.rarity-mythic {
+  border-left-color: var(--rarity-mythic);
+  background: linear-gradient(
+    90deg,
+    var(--color-surface),
+    rgba(248, 187, 208, 0.22)
+  );
+}
+
+.cat-row.silhouette {
+  opacity: 0.55;
+}
+
+.cat-row-sprite {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+}
+
+.cat-row-info {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+  min-width: 0;
+}
+
+.cat-row-name {
+  font-family: var(--font-display);
+  font-weight: 600;
+  color: var(--color-text);
+  font-size: 0.95rem;
+}
+
+.cat-row-rarity {
+  font-size: var(--text-micro);
+  color: var(--color-text-mute);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+}
+
+.cat-row-badges {
+  display: flex;
+  gap: 4px;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 7px;
+  border-radius: var(--radius-pill);
+  font-size: var(--text-micro);
+  font-weight: 700;
+  font-family: var(--font-display);
+}
+
+.badge-seed {
+  background: var(--color-grass);
+  color: #2f4a36;
+}
+.badge-infinite {
+  background: var(--color-primary-soft);
+  color: var(--color-primary-deep);
+  font-size: 1rem;
+}
+.badge-sold {
+  background: var(--color-coin);
+  color: #7d4d12;
+}

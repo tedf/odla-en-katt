@@ -1,0 +1,447 @@
+.garden-section {
+  background: linear-gradient(
+    180deg,
+    var(--color-surface-warm) 0%,
+    #fff1d8 100%
+  );
+}
+
+.garden-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-md);
+  gap: var(--space-sm);
+}
+
+.garden-harvest-all {
+  background: var(--color-primary);
+  color: white;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.85rem;
+  padding: 8px 14px 10px;
+  border-radius: var(--radius-pill);
+  box-shadow: var(--shadow-button);
+  transition: transform var(--duration-fast) var(--ease-back);
+  white-space: nowrap;
+}
+
+.garden-harvest-all:hover {
+  transform: translateY(-2px);
+}
+.garden-harvest-all:active {
+  transform: translateY(2px);
+  box-shadow: 0 0 0 var(--color-primary-deep);
+}
+
+.garden-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-md);
+}
+
+@media (min-width: 600px) {
+  .garden-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.plot-card {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  border-radius: var(--radius-lg);
+  background: radial-gradient(
+    140% 90% at 50% 10%,
+    #d8c2a8 0%,
+    var(--color-soil) 60%,
+    var(--color-soil-deep) 100%
+  );
+  box-shadow: var(--shadow-plot);
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  cursor: pointer;
+  transition: transform var(--duration-fast) var(--ease-out-expo);
+}
+
+.plot-card:hover {
+  transform: translateY(-2px);
+}
+
+.plot-card.locked {
+  cursor: default;
+  background: linear-gradient(
+    180deg,
+    rgba(204, 195, 215, 0.7),
+    rgba(167, 152, 188, 0.7)
+  );
+  box-shadow:
+    inset 0 -8px 0 rgba(70, 50, 90, 0.18),
+    inset 0 2px 0 rgba(255, 255, 255, 0.4),
+    0 6px 14px -6px rgba(102, 71, 122, 0.3);
+}
+
+.plot-card::before {
+  content: '';
+  position: absolute;
+  inset: 6px;
+  border-radius: 18px;
+  background: radial-gradient(
+    100% 90% at 50% 15%,
+    rgba(255, 255, 255, 0.15),
+    rgba(0, 0, 0, 0) 60%
+  );
+  pointer-events: none;
+}
+
+.plot-card:not(.locked)::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 22%;
+  background:
+    radial-gradient(
+      14% 90% at 18% 100%,
+      var(--color-grass) 0%,
+      rgba(168, 216, 185, 0) 80%
+    ),
+    radial-gradient(
+      14% 80% at 50% 100%,
+      var(--color-grass-shadow) 0%,
+      rgba(123, 166, 124, 0) 80%
+    ),
+    radial-gradient(
+      14% 90% at 82% 100%,
+      var(--color-grass) 0%,
+      rgba(168, 216, 185, 0) 80%
+    );
+  pointer-events: none;
+  opacity: 0.7;
+}
+
+.plot-inner {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: var(--space-sm);
+  width: 100%;
+  height: 100%;
+}
+
+.plot-empty-prompt {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  color: rgba(255, 255, 255, 0.95);
+  text-shadow: 0 1px 0 rgba(58, 45, 79, 0.3);
+}
+
+.plus-circle {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.85);
+  color: var(--color-primary);
+  display: grid;
+  place-items: center;
+  font-size: 36px;
+  font-family: var(--font-display);
+  font-weight: 700;
+  box-shadow: 0 4px 0 rgba(58, 45, 79, 0.15);
+  transition: transform var(--duration-fast) var(--ease-back);
+}
+
+.plot-card:hover .plus-circle {
+  transform: scale(1.08) rotate(8deg);
+}
+
+.plot-empty-label {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.8rem;
+  letter-spacing: 0.04em;
+}
+
+.plot-locked {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-text-soft);
+  text-align: center;
+  padding: var(--space-sm);
+}
+
+.plot-locked .lock-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.7);
+  display: grid;
+  place-items: center;
+}
+
+.plot-locked-threshold {
+  font-family: var(--font-display);
+  font-weight: 700;
+  color: var(--color-text);
+  font-size: 0.95rem;
+}
+
+.plot-locked-sub {
+  font-size: var(--text-micro);
+  color: var(--color-text-soft);
+}
+
+.plot-growing-stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.plot-growing-meta {
+  position: absolute;
+  inset: auto 10px 10px 10px;
+  z-index: 2;
+  background: rgba(255, 255, 255, 0.92);
+  border-radius: var(--radius-md);
+  padding: 6px 8px;
+  display: grid;
+  gap: 4px;
+  font-size: var(--text-micro);
+}
+
+.plot-growing-meta .row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-text);
+  font-weight: 700;
+}
+
+.plot-growing-meta .name {
+  font-family: var(--font-display);
+  font-size: 0.85rem;
+}
+
+.plot-growing-meta .time {
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-soft);
+}
+
+.plot-bar {
+  width: 100%;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+}
+
+.plot-bar > span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    var(--bar-from, var(--color-grass)) 0%,
+    var(--bar-to, var(--color-primary)) 100%
+  );
+  transition: width var(--duration-normal) linear;
+}
+
+.plot-ready-cta {
+  position: absolute;
+  inset: auto 10px 10px 10px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 14px 12px;
+  border-radius: var(--radius-pill);
+  background: var(--color-primary);
+  color: white;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.9rem;
+  box-shadow: var(--shadow-button);
+  transition: transform var(--duration-fast) var(--ease-back);
+}
+
+.plot-card.is-ready .plot-inner > div:first-child {
+  animation: ready-bounce 1.4s ease-in-out infinite;
+}
+
+@keyframes ready-bounce {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+.plot-bolt-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 3;
+  background: linear-gradient(135deg, #ffeb3b, #ffb74d);
+  color: #5a2b00;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.7rem;
+  padding: 4px 8px;
+  border-radius: var(--radius-pill);
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.2);
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.plot-storm-cloud {
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 4;
+  pointer-events: none;
+}
+
+@keyframes storm-shake {
+  0%,
+  100% {
+    transform: translateX(-50%) translateY(0);
+  }
+  20% {
+    transform: translateX(-52%) translateY(-2px);
+  }
+  40% {
+    transform: translateX(-48%) translateY(2px);
+  }
+  60% {
+    transform: translateX(-51%) translateY(-1px);
+  }
+  80% {
+    transform: translateX(-50%) translateY(1px);
+  }
+}
+
+.plot-storm-cloud.active {
+  animation: storm-shake 0.5s ease-in-out 3;
+}
+
+/* ---- Plant sheet (modal) ---- */
+.plant-sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(58, 45, 79, 0.45);
+  backdrop-filter: blur(6px);
+  z-index: 1000;
+  display: grid;
+  place-items: end center;
+  padding: var(--space-md);
+}
+
+@media (min-width: 720px) {
+  .plant-sheet-backdrop {
+    place-items: center;
+  }
+}
+
+.plant-sheet {
+  background: var(--color-surface-warm);
+  border-radius: var(--radius-lg);
+  padding: var(--space-lg);
+  width: 100%;
+  max-width: 460px;
+  box-shadow: var(--shadow-floating);
+  max-height: 80dvh;
+  overflow-y: auto;
+}
+
+.plant-sheet h3 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.2rem;
+  margin: 0 0 var(--space-xs);
+}
+
+.plant-sheet-sub {
+  font-size: var(--text-small);
+  color: var(--color-text-mute);
+  margin-bottom: var(--space-md);
+}
+
+.plant-sheet-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.seed-row {
+  display: grid;
+  grid-template-columns: 56px 1fr auto;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: 8px 10px;
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  border: 2px solid transparent;
+  transition: all var(--duration-fast) var(--ease-out-expo);
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+}
+
+.seed-row:hover:not(:disabled) {
+  border-color: var(--color-primary);
+  background: var(--color-primary-soft);
+}
+
+.seed-row:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.seed-row-name {
+  font-family: var(--font-display);
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.seed-row-meta {
+  font-size: var(--text-micro);
+  color: var(--color-text-mute);
+}
+
+.seed-row-count {
+  font-family: var(--font-display);
+  font-weight: 700;
+  color: var(--color-primary-deep);
+}
+
+.plant-sheet-close {
+  margin-top: var(--space-md);
+  width: 100%;
+  padding: 10px;
+  border-radius: var(--radius-pill);
+  background: rgba(58, 45, 79, 0.1);
+  color: var(--color-text);
+  font-family: var(--font-display);
+  font-weight: 600;
+}

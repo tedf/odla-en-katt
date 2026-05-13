@@ -1,0 +1,49 @@
+.cat-sprite {
+  display: block;
+  position: relative;
+}
+
+.cat-sprite svg {
+  display: block;
+  overflow: visible;
+}
+
+@keyframes cat-wiggle-anim {
+  0%,
+  100% {
+    transform: rotate(-2deg);
+  }
+  50% {
+    transform: rotate(2deg);
+  }
+}
+
+.cat-wiggle {
+  animation: cat-wiggle-anim 4s ease-in-out infinite;
+  transform-origin: 50% 90%;
+}
+
+.cat-glow {
+  filter: drop-shadow(0 0 12px var(--glow-color, rgba(255, 213, 107, 0.6)));
+}
+
+@keyframes cat-bounce {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+.cat-bounce {
+  animation: cat-bounce 1.2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cat-wiggle,
+  .cat-bounce {
+    animation: none;
+  }
+}
