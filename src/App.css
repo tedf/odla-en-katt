@@ -196,12 +196,19 @@
   }
   .panel-center {
     grid-column: 2;
+    /* Keep center panel firmly in grid flow. `position: relative` +
+       `isolation: isolate` establish a stacking context so any animated
+       modal/sheet WITHIN the shop stays scoped to its column instead of
+       escaping to document root. */
+    position: relative;
     min-width: 0;
     display: flex;
     flex-direction: column;
     min-height: 0;
+    isolation: isolate;
+    z-index: 0;
   }
-  .panel-right { grid-column: 3; min-width: 0; }
+  .panel-right { grid-column: 3; min-width: 0; position: relative; z-index: 0; }
 }
 
 @media (min-width: 1280px) {
@@ -295,13 +302,21 @@
 
 @media (min-width: 900px) {
   .panel-center-content {
+    /* Scrolls within the center column without affecting the garden or
+       side-stats columns. */
     overflow-y: auto;
     overflow-x: hidden;
     padding-right: 4px;
+    min-height: 0;
   }
   /* hide all slots that are not the active panel tab */
   .panel-center .panel-slot { display: none; }
   .panel-center .panel-slot.active { display: block; animation: panel-fade-in 0.3s var(--ease-out-expo); }
+  .panel-center .panel-slot.active > .section-card {
+    /* Keep section-card relative inside the column; nothing inside the shop
+       should use position: fixed/absolute that escapes this stacking context. */
+    position: relative;
+  }
 }
 
 @keyframes panel-fade-in {

@@ -19,13 +19,21 @@ export type CatTypeId =
   | 'jordgubbskatt'
   | 'kokosnotkatt'
   | 'citruskatt'
+  | 'lavendercat'
+  | 'honeycat'
   | 'isbjornkatt'
   | 'vulkankatt'
+  | 'crystalcat'
+  | 'ghostcat'
   | 'regnbagskatt'
   | 'drakkatt'
+  | 'phoenixcat'
+  | 'tidekatt'
   | 'stjarnkatt'
   | 'enhornigskatt'
-  | 'rymkatt';
+  | 'thundercat'
+  | 'rymkatt'
+  | 'cosmiccat';
 
 export interface UnlockCondition {
   /** Lifetime earned coins threshold (inclusive). Null = no threshold gate. */
@@ -62,8 +70,8 @@ export interface CatType {
   unlock: UnlockCondition;
 }
 
-const ONE_MINUTE = 60 * 1000;
-const ONE_HOUR = 60 * ONE_MINUTE;
+const ONE_MIN = 60 * 1000;
+const ONE_HOUR = 60 * ONE_MIN;
 
 export const CAT_TYPES: Readonly<Record<CatTypeId, CatType>> = {
   graskatt: {
@@ -88,7 +96,7 @@ export const CAT_TYPES: Readonly<Record<CatTypeId, CatType>> = {
     name: 'Morotskatt',
     description: 'Crunchy och morotsorange. Älskar morgnar.',
     rarity: 'uncommon',
-    growMs: 2 * ONE_MINUTE,
+    growMs: 2 * ONE_MIN,
     sellValue: 35,
     seedCost: 25,
     infinite: false,
@@ -105,7 +113,7 @@ export const CAT_TYPES: Readonly<Record<CatTypeId, CatType>> = {
     name: 'Bamboukatt',
     description: 'Fridfull och lat. Tuggar tankfullt på bambu.',
     rarity: 'common',
-    growMs: 25 * ONE_MINUTE,
+    growMs: 25 * ONE_MIN,
     sellValue: 90,
     seedCost: 70,
     infinite: false,
@@ -122,7 +130,7 @@ export const CAT_TYPES: Readonly<Record<CatTypeId, CatType>> = {
     name: 'Blåbärskatt',
     description: 'Färgglad som ett blåbärsmoln vid skymning.',
     rarity: 'uncommon',
-    growMs: 5 * ONE_MINUTE,
+    growMs: 5 * ONE_MIN,
     sellValue: 80,
     seedCost: 60,
     infinite: false,
@@ -139,7 +147,7 @@ export const CAT_TYPES: Readonly<Record<CatTypeId, CatType>> = {
     name: 'Jordgubbskatt',
     description: 'Söt som sommarens första jordgubbe.',
     rarity: 'rare',
-    growMs: 10 * ONE_MINUTE,
+    growMs: 10 * ONE_MIN,
     sellValue: 150,
     seedCost: 110,
     infinite: false,
@@ -156,7 +164,7 @@ export const CAT_TYPES: Readonly<Record<CatTypeId, CatType>> = {
     name: 'Kokosnötkatt',
     description: 'Tropisk och krämig. Doftar palmsol.',
     rarity: 'uncommon',
-    growMs: 45 * ONE_MINUTE,
+    growMs: 45 * ONE_MIN,
     sellValue: 350,
     seedCost: 240,
     infinite: false,
@@ -173,7 +181,7 @@ export const CAT_TYPES: Readonly<Record<CatTypeId, CatType>> = {
     name: 'Citruskatt',
     description: 'Citronfräsch. Smaskar lite på solen.',
     rarity: 'rare',
-    growMs: 15 * ONE_MINUTE,
+    growMs: 15 * ONE_MIN,
     sellValue: 220,
     seedCost: 160,
     infinite: false,
@@ -185,12 +193,46 @@ export const CAT_TYPES: Readonly<Record<CatTypeId, CatType>> = {
     },
     unlock: { totalEarned: 1200, graskattsSold: null },
   },
+  lavendercat: {
+    id: 'lavendercat',
+    name: 'Lavendelkatt',
+    description: 'Doftar underbart och syns i mörkret.',
+    rarity: 'uncommon',
+    growMs: 35 * ONE_MIN,
+    sellValue: 280,
+    seedCost: 200,
+    infinite: false,
+    palette: {
+      body: '#9B59B6',
+      accent: '#E8DAEF',
+      shadow: '#6C3483',
+      glow: '#D7BDE2',
+    },
+    unlock: { totalEarned: 1700, graskattsSold: null },
+  },
+  honeycat: {
+    id: 'honeycat',
+    name: 'Honingskatt',
+    description: 'Söt som honung, klibbig som karamell.',
+    rarity: 'uncommon',
+    growMs: 40 * ONE_MIN,
+    sellValue: 320,
+    seedCost: 230,
+    infinite: false,
+    palette: {
+      body: '#F39C12',
+      accent: '#FEF9E7',
+      shadow: '#D35400',
+      glow: '#FAD7A0',
+    },
+    unlock: { totalEarned: 2000, graskattsSold: null },
+  },
   isbjornkatt: {
     id: 'isbjornkatt',
     name: 'Isbjörnkatt',
     description: 'Kylig och stolt. Bor i arktiska drömmar.',
     rarity: 'rare',
-    growMs: 75 * ONE_MINUTE,
+    growMs: 75 * ONE_MIN,
     sellValue: 580,
     seedCost: 400,
     infinite: false,
@@ -207,7 +249,7 @@ export const CAT_TYPES: Readonly<Record<CatTypeId, CatType>> = {
     name: 'Vulkankatt',
     description: 'Het och explosiv. Spinnandet låter som lava.',
     rarity: 'rare',
-    growMs: 90 * ONE_MINUTE,
+    growMs: 90 * ONE_MIN,
     sellValue: 700,
     seedCost: 480,
     infinite: false,
@@ -219,12 +261,46 @@ export const CAT_TYPES: Readonly<Record<CatTypeId, CatType>> = {
     },
     unlock: { totalEarned: 2800, graskattsSold: null },
   },
+  crystalcat: {
+    id: 'crystalcat',
+    name: 'Kristallkatt',
+    description: 'Genomskinlig och skimrande i alla regnbågens färger.',
+    rarity: 'rare',
+    growMs: 100 * ONE_MIN,
+    sellValue: 900,
+    seedCost: 650,
+    infinite: false,
+    palette: {
+      body: '#85C1E9',
+      accent: '#FDFEFE',
+      shadow: '#2980B9',
+      glow: '#AED6F1',
+    },
+    unlock: { totalEarned: 3200, graskattsSold: null },
+  },
+  ghostcat: {
+    id: 'ghostcat',
+    name: 'Spökkatt',
+    description: 'Halvt genomskinlig och lite läskig.',
+    rarity: 'rare',
+    growMs: 110 * ONE_MIN,
+    sellValue: 1000,
+    seedCost: 720,
+    infinite: false,
+    palette: {
+      body: '#BDC3C7',
+      accent: '#ECF0F1',
+      shadow: '#7F8C8D',
+      glow: '#EAEDED',
+    },
+    unlock: { totalEarned: 3400, graskattsSold: null },
+  },
   regnbagskatt: {
     id: 'regnbagskatt',
     name: 'Regnbågskatt',
     description: 'Skimrar i alla färger samtidigt. Sällsynt magi.',
     rarity: 'epic',
-    growMs: 30 * ONE_MINUTE,
+    growMs: 30 * ONE_MIN,
     sellValue: 500,
     seedCost: 350,
     infinite: false,
@@ -252,6 +328,40 @@ export const CAT_TYPES: Readonly<Record<CatTypeId, CatType>> = {
       glow: '#C77DFF',
     },
     unlock: { totalEarned: 6000, graskattsSold: null },
+  },
+  phoenixcat: {
+    id: 'phoenixcat',
+    name: 'Fenixkatt',
+    description: 'Återföds ur elden, varje gång starkare.',
+    rarity: 'epic',
+    growMs: 150 * ONE_MIN,
+    sellValue: 3500,
+    seedCost: 2400,
+    infinite: false,
+    palette: {
+      body: '#E74C3C',
+      accent: '#F9E79F',
+      shadow: '#922B21',
+      glow: '#FADBD8',
+    },
+    unlock: { totalEarned: 7500, graskattsSold: null },
+  },
+  tidekatt: {
+    id: 'tidekatt',
+    name: 'Tidvattenkatt',
+    description: 'Styr havets vågor med sina tassar.',
+    rarity: 'epic',
+    growMs: 160 * ONE_MIN,
+    sellValue: 4000,
+    seedCost: 2800,
+    infinite: false,
+    palette: {
+      body: '#1A5276',
+      accent: '#85C1E9',
+      shadow: '#154360',
+      glow: '#5DADE2',
+    },
+    unlock: { totalEarned: 8200, graskattsSold: null },
   },
   stjarnkatt: {
     id: 'stjarnkatt',
@@ -287,6 +397,23 @@ export const CAT_TYPES: Readonly<Record<CatTypeId, CatType>> = {
     },
     unlock: { totalEarned: 18000, graskattsSold: null },
   },
+  thundercat: {
+    id: 'thundercat',
+    name: 'Åskkatt',
+    description: 'Rider på blixtar och talar med molnen.',
+    rarity: 'legendary',
+    growMs: 5 * ONE_HOUR,
+    sellValue: 12000,
+    seedCost: 8000,
+    infinite: false,
+    palette: {
+      body: '#1B2631',
+      accent: '#F4D03F',
+      shadow: '#0A0F12',
+      glow: '#F9E79F',
+    },
+    unlock: { totalEarned: 25000, graskattsSold: null },
+  },
   rymkatt: {
     id: 'rymkatt',
     name: 'Rymkatt',
@@ -304,8 +431,30 @@ export const CAT_TYPES: Readonly<Record<CatTypeId, CatType>> = {
     },
     unlock: { totalEarned: 35000, graskattsSold: null },
   },
+  cosmiccat: {
+    id: 'cosmiccat',
+    name: 'Kosmisk Katt',
+    description: 'Född i Big Bang. Existerar i alla dimensioner samtidigt.',
+    rarity: 'mythic',
+    growMs: 8 * ONE_HOUR,
+    sellValue: 50000,
+    seedCost: 35000,
+    infinite: false,
+    palette: {
+      body: '#0D0221',
+      accent: '#FF00FF',
+      shadow: '#060110',
+      glow: '#DA70D6',
+    },
+    unlock: { totalEarned: 100000, graskattsSold: null },
+  },
 };
 
+/**
+ * Order used by the shop and any UI that lists cat types.
+ * Sorted roughly by progression / sell value — common → uncommon → rare
+ * → epic → legendary → mythic.
+ */
 export const CAT_TYPE_ORDER: readonly CatTypeId[] = [
   'graskatt',
   'morotskatt',
@@ -314,13 +463,21 @@ export const CAT_TYPE_ORDER: readonly CatTypeId[] = [
   'jordgubbskatt',
   'kokosnotkatt',
   'citruskatt',
+  'lavendercat',
+  'honeycat',
   'isbjornkatt',
   'vulkankatt',
+  'crystalcat',
+  'ghostcat',
   'regnbagskatt',
   'drakkatt',
+  'phoenixcat',
+  'tidekatt',
   'stjarnkatt',
   'enhornigskatt',
+  'thundercat',
   'rymkatt',
+  'cosmiccat',
 ];
 
 export const RARITY_TINT: Readonly<Record<Rarity, string>> = {

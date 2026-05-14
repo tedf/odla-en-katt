@@ -189,21 +189,49 @@ export function isValidTraitId(id: string): id is CatTraitId {
 export interface RolledPersonality {
   name: string;
   traitId: CatTraitId;
+  /** Second trait, populated only when the caller asks for one (cat_whisperer). */
+  extraTraitId?: CatTraitId;
+}
+
+export interface RollPersonalityOptions {
+  /**
+   * Probability in [0,1] that the FIRST trait is forced to `lucky` or
+   * `magical` (50/50 between them when triggered). Used by `lucky_soil`.
+   */
+  luckyMagicalBias?: number;
+  /** When true, roll a second independent trait (used by `cat_whisperer`). */
+  rollExtraTrait?: boolean;
 }
 
 /**
  * Picks a random name + trait. `rng` is injectable for testability.
+ * `options` lets utility upgrades bias the roll or request a second trait.
  */
 export function rollPersonality(
   rng: () => number = Math.random,
+  options: RollPersonalityOptions = {},
 ): RolledPersonality {
   const nameIdx = Math.floor(rng() * CAT_NAMES.length);
-  const traitIdx = Math.floor(rng() * CAT_TRAITS.length);
   const fallbackName = CAT_NAMES[0] ?? 'Mittens';
   const fallbackTrait = CAT_TRAITS[0]!;
   const name = CAT_NAMES[nameIdx] ?? fallbackName;
-  const trait = CAT_TRAITS[traitIdx] ?? fallbackTrait;
-  return { name, traitId: trait.id };
+
+  let traitId: CatTraitId;
+  const bias = options.luckyMagicalBias ?? 0;
+  if (bias > 0 && rng() < bias) {
+    // Force lucky or magical.
+    traitId = rng() < 0.5 ? 'lucky' : 'magical';
+  } else {
+    const traitIdx = Math.floor(rng() * CAT_TRAITS.length);
+    traitId = (CAT_TRAITS[traitIdx] ?? fallbackTrait).id;
+  }
+
+  if (options.rollExtraTrait) {
+    const extraIdx = Math.floor(rng() * CAT_TRAITS.length);
+    const extraTraitId = (CAT_TRAITS[extraIdx] ?? fallbackTrait).id;
+    return { name, traitId, extraTraitId };
+  }
+  return { name, traitId };
 }
 
 /**

@@ -208,16 +208,26 @@ export function rollWeatherTrigger(
 }
 
 /**
+ * Optional probability multipliers per event id. Passed in by the store to
+ * reflect player-owned utility upgrades (lightning rod, cosmic antenna).
+ * Missing entries are treated as 1x (no change).
+ */
+export type WeatherProbabilityMultipliers = Readonly<Record<string, number>>;
+
+/**
  * Picks the first weather event whose per-event cooldown is satisfied AND
  * whose probability roll fires this tick. Iterates from rarest to most common
  * so that on a very lucky tick the rarer (more interesting) event wins.
  *
  * `cooldownState[eventId]` should hold the last firing time per event.
+ * `probabilityMultipliers[eventId]` lets callers multiply per-event chance
+ * (e.g. lightning_rod = 2x for all, cosmic_antenna = 3x for meteor + tornado).
  */
 export function rollAnyWeatherEvent(
   cooldownState: Readonly<Record<string, number | null>>,
   now: number,
   rng: () => number = Math.random,
+  probabilityMultipliers: WeatherProbabilityMultipliers = {},
 ): WeatherEvent | null {
   // Rarest first so rare upgrades the result.
   for (let i = WEATHER_EVENTS.length - 1; i >= 0; i--) {
@@ -225,7 +235,9 @@ export function rollAnyWeatherEvent(
     if (!ev) continue;
     const last = cooldownState[ev.id] ?? null;
     if (last !== null && now - last < ev.cooldownMs) continue;
-    if (rollWeatherTrigger(ev.probability, rng)) {
+    const mult = probabilityMultipliers[ev.id] ?? 1;
+    const adjusted = Math.min(1, ev.probability * mult);
+    if (rollWeatherTrigger(adjusted, rng)) {
       return ev;
     }
   }

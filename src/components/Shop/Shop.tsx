@@ -9,12 +9,13 @@ import { CAT_TYPES, type CatTypeId } from '../../domain/catTypes';
 import { visibleSeeds } from '../../domain/economy';
 import { formatCoins, formatRemaining } from '../../domain/time';
 import {
-  SPEED_UPGRADES,
   UTILITY_UPGRADES,
   activeMultiplier,
+  classifySpeedUpgrades,
   getUpgradeById,
   type ActiveSpeedUpgrade,
   type SpeedUpgradeId,
+  type SpeedUpgradeStatus,
   type UtilityUpgradeId,
   type UtilityUpgrade,
 } from '../../domain/upgrades';
@@ -156,6 +157,7 @@ export function Shop({ onOpenLottery }: ShopProps = {}) {
       {tab === 'verktyg' && (
         <UtilityTab
           coins={coins}
+          totalEarned={totalEarned}
           owned={utilityUpgrades}
           onBuy={(id) => {
             if (buyUtilityUpgrade(id)) playBuyUpgrade();
@@ -168,52 +170,109 @@ export function Shop({ onOpenLottery }: ShopProps = {}) {
 
 interface UtilityTabProps {
   coins: number;
+  totalEarned: number;
   owned: UtilityUpgradeId[];
   onBuy: (id: UtilityUpgradeId) => void;
 }
 
-function UtilityTab({ coins, owned, onBuy }: UtilityTabProps) {
+type UtilityCardState = 'owned' | 'affordable' | 'locked-cost' | 'mystery';
+
+function classifyUtility(
+  upgrade: UtilityUpgrade,
+  totalEarned: number,
+  coins: number,
+  owned: boolean,
+): UtilityCardState {
+  if (owned) return 'owned';
+  if (totalEarned < upgrade.unlockThreshold) return 'mystery';
+  if (coins >= upgrade.cost) return 'affordable';
+  return 'locked-cost';
+}
+
+function UtilityTab({ coins, totalEarned, owned, onBuy }: UtilityTabProps) {
+  const classified = UTILITY_UPGRADES.map((u) => ({
+    upgrade: u,
+    state: classifyUtility(u, totalEarned, coins, owned.includes(u.id)),
+  }));
+
+  const nextMystery = classified.find((c) => c.state === 'mystery');
+  const nextThreshold = nextMystery
+    ? nextMystery.upgrade.unlockThreshold
+    : null;
+
   return (
     <div role="tabpanel">
       <p className="utility-intro">
         Permanenta verktyg som förbättrar trädgården för alltid.
       </p>
       <ul className="shop-list">
-        {UTILITY_UPGRADES.map((u) => (
+        {classified.map(({ upgrade, state }) => (
           <UtilityCard
-            key={u.id}
-            upgrade={u}
-            owned={owned.includes(u.id)}
-            canAfford={coins >= u.cost}
-            onBuy={() => onBuy(u.id)}
+            key={upgrade.id}
+            upgrade={upgrade}
+            state={state}
+            onBuy={() => onBuy(upgrade.id)}
           />
         ))}
       </ul>
+      {nextThreshold !== null && (
+        <p className="utility-next-hint num">
+          Nästa verktyg låses upp vid {formatCoins(nextThreshold)} intjänat.
+        </p>
+      )}
     </div>
   );
 }
 
 interface UtilityCardProps {
   upgrade: UtilityUpgrade;
-  owned: boolean;
-  canAfford: boolean;
+  state: UtilityCardState;
   onBuy: () => void;
 }
 
-function UtilityCard({ upgrade, owned, canAfford, onBuy }: UtilityCardProps) {
+function UtilityCard({ upgrade, state, onBuy }: UtilityCardProps) {
   const [shake, setShake] = useState(0);
   const handleClick = () => {
-    if (owned) return;
-    if (!canAfford) {
+    if (state === 'owned' || state === 'mystery') return;
+    if (state === 'locked-cost') {
       setShake(shake + 1);
       return;
     }
     onBuy();
   };
+
+  if (state === 'mystery') {
+    return (
+      <li className="utility-card utility-mystery" aria-label="Låst verktyg">
+        <div className="utility-emoji utility-mystery-emoji" aria-hidden="true">
+          ?
+        </div>
+        <div className="utility-body">
+          <div className="utility-name">???</div>
+          <div className="utility-desc">
+            Tjäna {formatCoins(upgrade.unlockThreshold)} mynt för att avslöja
+            detta verktyg.
+          </div>
+        </div>
+        <div className="utility-action">
+          <span className="utility-mystery-tag">
+            <LockMini /> Låst
+          </span>
+        </div>
+      </li>
+    );
+  }
+
   return (
     <motion.li
       key={`${upgrade.id}-${shake}`}
-      className={['utility-card', owned ? 'owned' : ''].filter(Boolean).join(' ')}
+      className={[
+        'utility-card',
+        state === 'owned' ? 'owned' : '',
+        state === 'locked-cost' ? 'locked-cost' : '',
+      ]
+        .filter(Boolean)
+        .join(' ')}
       animate={shake > 0 ? { x: [0, -6, 6, -4, 4, 0] } : { x: 0 }}
       transition={{ duration: 0.32 }}
     >
@@ -225,15 +284,23 @@ function UtilityCard({ upgrade, owned, canAfford, onBuy }: UtilityCardProps) {
         <div className="utility-desc">{upgrade.description}</div>
       </div>
       <div className="utility-action">
-        {owned ? (
+        {state === 'owned' ? (
           <span className="utility-owned-tag">
             <span aria-hidden="true">✓</span> Ägd
           </span>
+        ) : state === 'locked-cost' ? (
+          <button
+            type="button"
+            className="utility-buy utility-buy-locked"
+            onClick={handleClick}
+            title="För få mynt"
+          >
+            <LockMini /> {formatCoins(upgrade.cost)}
+          </button>
         ) : (
           <button
             type="button"
             className="utility-buy"
-            disabled={!canAfford}
             onClick={handleClick}
           >
             <CoinDot /> {formatCoins(upgrade.cost)}
@@ -337,12 +404,24 @@ function UpgradesTab({ coins, activeSpeedUpgrade, onBuy }: UpgradesTabProps) {
       </AnimatePresence>
 
       <ul className="shop-list">
-        {SPEED_UPGRADES.map((u) => {
+        {classifySpeedUpgrades(coins).map(({ upgrade: u, status }) => {
           const isActive =
             !!activeSpeedUpgrade &&
             activeSpeedUpgrade.upgradeId === u.id &&
             liveMult > 1;
-          const canAfford = coins >= u.cost;
+          // Always render affordable, the next aspirational boost, and any
+          // currently-active boost (in case it's now unaffordable to restart).
+          if (status === 'locked' && !isActive) {
+            return (
+              <LockedUpgradePreview
+                key={u.id}
+                name={u.name}
+                emoji={u.emoji}
+                multiplier={u.multiplier}
+                cost={u.cost}
+              />
+            );
+          }
           return (
             <UpgradeCard
               key={u.id}
@@ -360,13 +439,55 @@ function UpgradesTab({ coins, activeSpeedUpgrade, onBuy }: UpgradesTabProps) {
               hasOtherActive={
                 !!activeSpeedUpgrade && !isActive && liveMult > 1
               }
-              canAfford={canAfford}
+              canAfford={status === 'affordable'}
+              status={status}
               onBuy={() => onBuy(u.id)}
             />
           );
         })}
       </ul>
     </div>
+  );
+}
+
+interface LockedUpgradePreviewProps {
+  name: string;
+  emoji: string;
+  multiplier: number;
+  cost: number;
+}
+
+function LockedUpgradePreview({
+  name,
+  emoji,
+  multiplier,
+  cost,
+}: LockedUpgradePreviewProps) {
+  return (
+    <li className="upgrade-card upgrade-card-locked" aria-label={`Låst: ${name}`}>
+      <div className="upgrade-tier upgrade-tier-locked" aria-hidden="true">
+        <LockShape />
+      </div>
+      <div className="upgrade-body">
+        <div className="upgrade-title">
+          <span className="upgrade-name">
+            <span className="upgrade-emoji" aria-hidden="true">
+              {emoji}
+            </span>
+            {name}
+          </span>
+          <span className="upgrade-mult num">{multiplier}x</span>
+        </div>
+        <div className="upgrade-meta">
+          Lås upp genom att tjäna mer. Kostar {formatCoins(cost)} mynt.
+        </div>
+      </div>
+      <div className="upgrade-actions">
+        <span className="upgrade-locked-tag">
+          <LockMini /> Låst
+        </span>
+      </div>
+    </li>
   );
 }
 
@@ -455,6 +576,7 @@ interface UpgradeCardProps {
   isActive: boolean;
   hasOtherActive: boolean;
   canAfford: boolean;
+  status: SpeedUpgradeStatus;
   onBuy: () => void;
 }
 
@@ -463,6 +585,7 @@ function UpgradeCard({
   isActive,
   hasOtherActive,
   canAfford,
+  status,
   onBuy,
 }: UpgradeCardProps) {
   const [shake, setShake] = useState(0);
@@ -487,6 +610,7 @@ function UpgradeCard({
       className={[
         'upgrade-card',
         isActive ? 'active' : '',
+        status === 'next' ? 'next-goal' : '',
       ]
         .filter(Boolean)
         .join(' ')}
@@ -494,7 +618,7 @@ function UpgradeCard({
       transition={{ duration: 0.32 }}
     >
       <div className={`upgrade-tier tier-${upgrade.tier}`} aria-hidden="true">
-        <PotionSvg tier={upgrade.tier} />
+        <PotionSvg tier={Math.min(upgrade.tier, 4)} />
       </div>
       <div className="upgrade-body">
         <div className="upgrade-title">
@@ -507,6 +631,9 @@ function UpgradeCard({
           <span className="upgrade-mult num">{upgrade.multiplier}x</span>
         </div>
         <div className="upgrade-meta">{upgrade.description}</div>
+        {status === 'next' && !isActive && (
+          <div className="upgrade-next-pill">Nästa mål</div>
+        )}
       </div>
       <div className="upgrade-actions">
         <button

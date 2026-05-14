@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest';
 import {
   SPEED_UPGRADES,
   activeMultiplier,
+  classifySpeedUpgrades,
   getUpgradeById,
   isValidUpgradeId,
   makeActiveUpgrade,
@@ -13,8 +14,8 @@ import {
 } from '../upgrades';
 
 describe('SPEED_UPGRADES', () => {
-  it('defines four tiers with strictly increasing cost, multiplier, and duration', () => {
-    expect(SPEED_UPGRADES).toHaveLength(4);
+  it('defines eight tiers with strictly increasing cost, multiplier, and duration', () => {
+    expect(SPEED_UPGRADES).toHaveLength(8);
     for (let i = 1; i < SPEED_UPGRADES.length; i++) {
       const prev = SPEED_UPGRADES[i - 1]!;
       const cur = SPEED_UPGRADES[i]!;
@@ -45,6 +46,16 @@ describe('SPEED_UPGRADES', () => {
     expect(speed4?.multiplier).toBe(5.0);
     expect(speed4?.cost).toBe(4000);
     expect(speed4?.durationSeconds).toBe(4 * 60 * 60);
+
+    const speed5 = getUpgradeById('speed_5');
+    expect(speed5?.multiplier).toBe(8.0);
+    expect(speed5?.cost).toBe(15000);
+    expect(speed5?.durationSeconds).toBe(6 * 60 * 60);
+
+    const speed8 = getUpgradeById('speed_8');
+    expect(speed8?.multiplier).toBe(50.0);
+    expect(speed8?.cost).toBe(1000000);
+    expect(speed8?.durationSeconds).toBe(24 * 60 * 60);
   });
 
   it('exposes an emoji for every upgrade', () => {
@@ -114,16 +125,38 @@ describe('makeActiveUpgrade', () => {
 });
 
 describe('isValidUpgradeId', () => {
-  it('accepts all four known ids', () => {
-    expect(isValidUpgradeId('speed_1')).toBe(true);
-    expect(isValidUpgradeId('speed_2')).toBe(true);
-    expect(isValidUpgradeId('speed_3')).toBe(true);
-    expect(isValidUpgradeId('speed_4')).toBe(true);
+  it('accepts all eight known ids', () => {
+    for (let i = 1; i <= 8; i++) {
+      expect(isValidUpgradeId(`speed_${i}`)).toBe(true);
+    }
   });
 
   it('rejects unknown strings', () => {
-    expect(isValidUpgradeId('speed_5')).toBe(false);
+    expect(isValidUpgradeId('speed_9')).toBe(false);
     expect(isValidUpgradeId('')).toBe(false);
     expect(isValidUpgradeId('not_an_id')).toBe(false);
+  });
+});
+
+describe('classifySpeedUpgrades', () => {
+  it('marks every boost as affordable when player is wealthy', () => {
+    const result = classifySpeedUpgrades(10_000_000);
+    expect(result.every((r) => r.status === 'affordable')).toBe(true);
+  });
+
+  it('marks the cheapest unaffordable boost as next and the rest as locked', () => {
+    // Coins = 250 → can afford speed_1 (50) and speed_2 (200); speed_3 is next.
+    const result = classifySpeedUpgrades(250);
+    expect(result[0]!.status).toBe('affordable');
+    expect(result[1]!.status).toBe('affordable');
+    expect(result[2]!.status).toBe('next');
+    expect(result[3]!.status).toBe('locked');
+    expect(result[7]!.status).toBe('locked');
+  });
+
+  it('marks tier 1 as next when player has zero coins', () => {
+    const result = classifySpeedUpgrades(0);
+    expect(result[0]!.status).toBe('next');
+    expect(result[1]!.status).toBe('locked');
   });
 });

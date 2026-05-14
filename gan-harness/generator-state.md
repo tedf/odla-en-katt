@@ -1,207 +1,190 @@
-# Generator State — Iteration 002 (desktop layout redesign + wild animations)
+# Generator State — Iteration 003 (shop bug fix + 8 cats / 8 boosts / 8 tools)
 
 ## What Was Built This Iteration
 
-### Mission 1 — Desktop Layout Redesign (>= 900 px)
+### Bug fix — Shop / center panel stacking context
 
-The viewport is now a true desktop dashboard. The old "mobile design stretched
-to desktop" stack is gone.
+`src/App.css`:
 
-- New `app-body` is a CSS Grid: `minmax(0, 1fr) minmax(360px, 0.8fr)
-  minmax(240px, 0.55fr)`. At >= 1280 px the proportions widen with a
-  centered 1500 px max-width container.
-- **Left panel (`panel-main`)** — Garden takes the full column height, with
-  its own `overflow-y: auto` scroll.
-- **Middle panel (`panel-center`)** — Tabbed: a pill row at top swaps between
-  Butik / Uppdrag / Trofér / Stall / Hjulet. Active tab gets a pink
-  `linear-gradient` pill with shadow lift. The bottom area scrolls. Inactive
-  panel slots are `display: none` so only one renders.
-- **Right panel (`panel-right`)** — new `SideStats` aside, always visible on
-  desktop. Hidden via `display: none` on mobile.
-- Bottom nav (mobile) is hidden via `@media (min-width: 900px)`.
-- Top HUD spans the full width of the desktop layout.
+- `.panel-center` (desktop) now uses `position: relative`,
+  `isolation: isolate`, `z-index: 0`. Establishes a contained stacking
+  context so the upgrade-active banner's conic-gradient glow + any future
+  modal/sheet cannot escape to document root.
+- `.panel-right` mirrors the same `position: relative; z-index: 0`.
+- `.panel-center-content` keeps `overflow-y: auto / overflow-x: hidden`
+  and now has explicit `min-height: 0` so flex children scroll instead of
+  overflowing.
 
-### `SideStats` panel
+The shop already used `position: absolute` only for the inner
+`.upgrade-active-glow` (clipped by its parent's `overflow: hidden`), so
+the new isolate boundary fully scopes everything to its grid column.
 
-`src/components/SideStats/SideStats.tsx` + `side-stats.css`. Four mini-cards:
+### Feature 1 — 8 new cats (total 22, including a Mythic tier)
 
-1. **Mynt & tempo** — total earned + active speed boost chip (pulsing
-   gradient pill with countdown), or "Ingen boost" muted.
-2. **Dagens uppdrag** — up to 3 mini quest rows with mini progress bar,
-   ready-to-claim highlighted. Flickering streak chip when streak >= 3.
-3. **Senaste trofé** — last unlocked achievement, or "Inga trofér än —
-   börja odla!".
-4. **Väder** — "Stormvarning aktiv" with purple-tinted card +
-   pulsing copy when a plot has active weather, otherwise "Lugnt väder
-   i trädgården".
+`src/domain/catTypes.ts`:
 
-### Garden panel
+- Added `lavendercat`, `honeycat` (uncommon), `crystalcat`, `ghostcat`
+  (rare), `phoenixcat`, `tidekatt` (epic), `thundercat` (legendary), and
+  `cosmiccat` (mythic). Mythic tier was already in the rarity union;
+  Rymkatt and Kosmisk Katt both share it now.
+- `CAT_TYPE_ORDER` rewritten so the shop list flows by progression /
+  unlock threshold (1700, 2000, 2200, 2800, 3200, 3400, 3500, 6000, 7500,
+  8200, 9000, 18000, 25000, 35000, 100000).
+- Unlock thresholds chosen so the new cats slot between existing tiers
+  without disrupting the original tuning curve.
 
-- 3-column grid at >= 900 px (replaces the old 2-col responsive logic);
-  plot cards drop the 1:1 aspect-ratio and grow to `min-height: 180px`
-  (200 px at >= 1280 px) so growing/ready state has more vertical room.
-- New "Nästa odlingsyta öppnas vid …" progress bar under the grid with
-  coin/total numbers.
-- AmbientGarden mounted inside the section (see below).
+`src/components/CatDisplay/CatSprite.tsx`:
 
-### Mission 2 — Wild Animations
+- New SVG badges for every new cat, drawn from primitives:
+  - **Lavendelkatt** — 5-flower crown with stems and a soft scent glow.
+  - **Honingskatt** — three honeycomb hex cells on the belly + a bumbling
+    bee above the head with striped body and wings.
+  - **Kristallkatt** — three pointed crystal shards on the head + a
+    faceted belly diamond with refraction highlights.
+  - **Spökkatt** — translucent veil overlay, dot eyes, double wiggly
+    ghost tail along the lower body, ambient aura ring.
+  - **Fenixkatt** — flame wings on both sides, burning crest on top,
+    ember dots flanking the tail.
+  - **Tidvattenkatt** — wave curl band across the back + falling water
+    droplets with highlight.
+  - **Åskkatt** — three-cloud storm crown, large yellow lightning bolt
+    centered between the ears, body crackle lines.
+  - **Kosmisk Katt** — spiral galaxy on the belly with a rotating CSS
+    animation, plus 8 floating cosmic particles drifting in CSS-driven
+    staggered delays.
 
-#### A. Harvest Reveal (full-screen)
+`src/components/CatDisplay/cat-sprite.css`:
 
-`src/components/effects/HarvestReveal.tsx`. Triggered by the new
-`harvestReveal` store field every time `harvestCat()` resolves.
+- New `cosmic-spin` (galaxy rotation, 18 s) and `cosmic-drift`
+  (particles, 4.5-7 s with per-particle delays) keyframes.
+- `prefers-reduced-motion` override disables both.
 
-- Cat sprite balloons (scale 0.6 -> 14 -> 16 -> 0) over 950 ms with
-  rotation kicks via Framer Motion `times` keyframes.
-- 14 colored particles radiate from center (cat-palette gradient
-  picked per cat).
-- Legendary / mythic harvests get 3 stacked CSS shockwave rings
-  (`shockwave-out` keyframe, 18x scale) and a screen-wash flash tinted
-  to the rarity (sakura pink for mythic, gold for legendary).
+`src/components/Shop/shop.css`:
 
-#### B. Coin Cascade
+- `seed-card.rarity-mythic` now uses an animated bordered card
+  (`mythic-border` keyframe, 6 s) plus an intense magenta glow with
+  shadow + inset rim.
 
-`src/components/effects/FloatingCoins.tsx` extended.
+### Feature 2 — 8 boost tiers (was 4)
 
-- The existing "+N mynt" badge still floats up, **plus** 8 coin emoji
-  arrange around the cascade origin in a fountain pattern and fly up to
-  the top of the screen with staggered delay and per-coin rotation.
-- The HUD coin counter already pulses on `coinPulseKey` change.
+`src/domain/upgrades.ts`:
 
-#### C. Bouncing ready cat + ambient sparks
+- `SPEED_UPGRADES` expanded to 8 tiers: 1.5x / 2x / 3x / 5x / 8x / 12x /
+  20x / 50x. Costs scale 50 → 1,000,000; durations 30 min → 24 h.
+  Emojis cover potion → tornado → portal → cosmos → explosion → stop.
+- New `SpeedUpgradeId` union now includes `speed_5..8`.
+- New pure helper `classifySpeedUpgrades(coins)` returns each upgrade
+  tagged as `affordable`, `next`, or `locked`. The shop uses this to
+  show all affordable boosts plus the next aspirational one, and renders
+  far-away boosts as locked previews.
 
-`garden.css`:
+`src/components/Shop/Shop.tsx`:
 
-- `ready-bounce` keyframe now runs at 0.6 s (was 1.4 s) with a 12 px
-  jump.
-- `::before` and `::after` pseudo elements float up sparkles around the
-  bouncing cat in a 2.2 s loop.
-- The harvest CTA pill pulses with a green glow ring
-  (`ready-cta-pulse`).
+- `UpgradesTab` iterates `classifySpeedUpgrades(coins)`; far-out tiers
+  become a `LockedUpgradePreview` row with a lock badge and hint copy;
+  the next-affordable boost gets a "Nästa mål" pill.
+- `UpgradeCard` accepts the new `status` prop and applies a
+  `next-goal` class (subtle gold-tint background, gold "Nästa mål"
+  pill) when the boost is the next aspirational tier.
 
-#### D. Weather impact (per-event flair)
+### Feature 3 — 8 utility tools (was 1)
 
-`PlotCard.tsx` — new `WeatherSpecial` subcomponent renders the right
-animation per event id:
+`src/domain/upgrades.ts`:
 
-- **Lightning** — hand-drawn SVG bolt that strokes itself via
-  `stroke-dashoffset` from 220 to 0, glow shadow on the bolt, plot
-  shakes with a 5-step `lightning-shake` keyframe.
-- **Tornado** — two nested rotating dashed circles
-  (`tornado-vortex` keyframe, 1440 deg rotation).
-- **Meteor** — emoji falls from -200 px to +220 px with
-  `cubic-bezier(0.5, 0, 0.75, 0.2)` (gravity), then a circular
-  shockwave (`meteor-shock` keyframe scales 0.3 -> 8x) expands at impact.
-  Whole `.app-body` shakes via `camera-shake` keyframe.
-- **Snow** — particle fall (existing) plus a soft frost overlay
-  inside the plot that fades over 5 s.
-- **Rain** — uses the existing rain raindrop streaks.
+- `UTILITY_UPGRADES` expanded from 1 to 8 entries. Each now carries an
+  `unlockThreshold: number` (lifetime-earned coins required before the
+  tool is revealed in the shop).
+- New derived helpers:
+  - `seedInventoryCap(owned)` — 5 base, 10 with `extra_seed_slot`
+  - `weatherProbabilityMultipliers(owned)` — 2x for all events with
+    `lightning_rod`; 3x for meteor + tornado with `cosmic_antenna`
+    (multiplicative)
+  - `sellValueMultiplier(owned)` — 1.10 with `golden_watering_can`
+  - `offlineTimeMultiplier(owned)` — 2 with `time_capsule`
+  - `luckyMagicalBias(owned)` — 0.15 with `lucky_soil`
+  - `hasCatWhisperer(owned)` — true with `cat_whisperer`
 
-`LightningFlash.tsx` already does the fullscreen color-wash tinted per
-event id.
+`src/store/useGameStore.ts` (wiring):
 
-#### E. Achievement / lottery fireworks
+- `tick()` now passes `weatherProbabilityMultipliers(state.utilityUpgrades)`
+  into `rollAnyWeatherEvent`.
+- `harvestCat()` reads the owner's utilities and:
+  - rolls personality with `luckyMagicalBias` and optional
+    `rollExtraTrait` (cat_whisperer)
+  - stacks the extra trait's `traitValueMultiplier` multiplicatively
+  - applies `sellValueMultiplier` for `golden_watering_can` on every
+    sale.
+- `buySeed()` honors `seedInventoryCap`. Trying to buy past the cap
+  yields a toast ("Fröpåsen är full") instead of silently subtracting
+  coins.
+- `bootstrapInitialState()` multiplies the offline-time speed by
+  `offlineTimeMultiplier(save.utilityUpgrades)` before feeding it into
+  `calculateOfflineProgress`.
 
-`src/components/effects/Fireworks.tsx` + queue in store
-(`fireworks: FireworksBurst[]`).
+`src/domain/events.ts`:
 
-- Each burst is 6 rockets: vertical trail line shoots up
-  (`scaleY` 0 -> 1 -> 0), then a 12-star radial burst around the rocket
-  apex, plus a soft bright flash, all tinted by burst.tint.
-- 24 confetti strips fall across the full viewport in 2.4-3.4 s with
-  per-strip delays and a rotation arc.
-- Fired automatically by:
-  - Newly-unlocked achievements (one per achievement, capped at 3).
-  - Legendary / mythic cat harvests.
-  - Lottery wins >= 500 coins or rare+ seeds.
+- `rollAnyWeatherEvent` accepts an optional 4th `probabilityMultipliers`
+  argument. Adjusted probability is capped at 1.0 per event.
 
-#### F. Sell pop-up
+`src/domain/catPersonality.ts`:
 
-`src/components/effects/SellPopUp.tsx`. Big rarity-colored "+1250"
-floats up 120 px in 1.5 s with rotation kicks. Font size scales by
-amount.
+- `rollPersonality` now accepts a 2nd `options` argument
+  (`{luckyMagicalBias, rollExtraTrait}`). When bias > 0 and the roll
+  fires, the trait is forced to `lucky` or `magical` (50/50). When
+  `rollExtraTrait` is true, an `extraTraitId` is included in the result.
 
-#### G. Planting splat
+`src/components/Shop/Shop.tsx`:
 
-When a seed is planted, `PlotCard` flashes a brown soil blob
-(`splat-pop`, 0.7 s) plus 6 dust dots scattering radially
-(`splat-dust`, 0.9 s) over the plot. The growing-stage sprite springs
-in via `sprout-in` (0 -> 1.15 -> 1, 0.7 s).
+- `UtilityTab` classifies every tool as `owned` (green ✓), `affordable`
+  (active purple buy button), `locked-cost` (locked icon + cost, shake
+  on click), or `mystery` (shown as "???" with hashed background until
+  the threshold is reached). A "Nästa verktyg låses upp vid X mynt
+  intjänat" hint appears below the list whenever there is a hidden tool.
 
-#### H. Streak fire animation
+### Tests
 
-`SideStats` mini streak pill uses the existing `streak-flame-flicker`
-keyframe (4-step scale + rotate, drop-shadow glow) when streak >= 3.
+`src/domain/__tests__/upgrades.test.ts`:
 
-#### I. Ambient garden particles
+- Updated `SPEED_UPGRADES` length assertion to 8.
+- Added per-tier spec checks for tiers 5 and 8.
+- New `describe('classifySpeedUpgrades')` block with three cases:
+  wealthy player (all affordable), partial wealth (1 affordable, 1
+  next, rest locked), broke (tier 1 marked as next).
 
-`src/components/effects/AmbientGarden.tsx` + CSS keyframes in
-`App.css`.
-
-- 4 butterflies drift left -> right with a sinusoidal-style sway
-  controlled by per-butterfly `--sway` CSS var and varied durations
-  (18 / 22 / 26 / 30 s).
-- 3 leaves do a slower diagonal drift with continuous rotation.
-- 5 sparkle dots twinkle in place via `ambient-twinkle` (4 -> 7 s).
-- All ambient layer is `overflow: hidden`-clipped inside
-  `.garden-section` so nothing escapes.
-
-### Reduced motion
-
-- New `useReducedMotion()` hook reads both system
-  `prefers-reduced-motion` and the in-app `settings.reducedMotion`
-  toggle.
-- `HarvestReveal`, `Fireworks`, and `AmbientGarden` short-circuit to
-  `null` when reduced motion is on.
-- `SellPopUp` runs a simple fade-only variant.
-- All decorative CSS keyframes have a matching
-  `@media (prefers-reduced-motion: reduce)` override that disables the
-  animation.
-
-### Store additions
-
-- `harvestReveal: HarvestReveal | null` (set by `harvestCat`).
-- `fireworks: FireworksBurst[]` (queued from achievements, lottery,
-  rare harvests).
-- `sellPopUps: SellPopUp[]` (set by `harvestCat`).
-- Three new actions: `clearHarvestReveal()`, `clearFirework(id)`,
-  `clearSellPopUp(id)`.
-- No save-schema changes — these are all ephemeral UI state and aren't
-  persisted.
+All 92 tests pass; previous tests untouched.
 
 ## What Changed This Iteration
 
-- Replaced single-column `.app-main` + side-panels layout with the
-  three-panel grid described above.
-- Added `panel-hidden-mobile` semantics (no-op at >= 900 px).
-- Added a desktop "tab pill" bar inside the center panel; mobile keeps
-  the existing bottom tabbar.
-- Added 6 new components (`HarvestReveal`, `Fireworks`, `SellPopUp`,
-  `AmbientGarden`, `SideStats`, plus `useReducedMotion` hook).
-- Added per-weather extra flair to PlotCard (`WeatherSpecial`).
-- Added planting splat + sprout-in to PlotCard.
-- Updated `garden.css` for 3-col desktop, taller plots, and the
-  unlock-progress card.
-- Extended store with harvest reveal / fireworks / sell pop-up queues
-  and the fireworks-on-achievement / fireworks-on-rare-lottery hooks.
+- Cat count: 14 → 22 (8 new across uncommon/rare/epic/legendary/mythic).
+- Speed boosts: 4 → 8 tiers.
+- Utility tools: 1 → 8.
+- Shop's Upgrades tab now uses a "show next aspirational + lock distant"
+  display strategy.
+- Shop's Verktyg tab now uses unlock thresholds with mystery (???) rows
+  for unreached tools.
+- The shop / center panel is now wrapped in its own stacking context so
+  nothing inside can escape to the document root.
 
 ## Known Issues / Limitations
 
-- Coin cascade dots originate from the screen-centered floating-coin
-  layer rather than from the actual harvest button — the dots fan
-  outward but don't trace a literal line to the HUD coin counter.
-- Meteor camera shake is single-direction (one animation cycle per
-  strike); back-to-back meteors within 700 ms won't re-trigger.
-- HarvestReveal scales the CatSprite SVG up 14x. The text inside the
-  cat stays sharp because SVG, but the drop-shadow filter clamps at the
-  viewport at very high scales — acceptable.
+- The `cat_whisperer` extra trait only affects sell value (multiplied
+  in via `traitValueMultiplier`). Growth-time traits from the second
+  roll are not applied because the cat is already fully grown by the
+  time we roll a personality. This matches the spec's framing of
+  personality as a post-harvest trait.
+- Mythic gradient border uses `-webkit-mask` / `mask-composite`.
+  Verified to render on Chrome / Safari / Firefox in the production
+  build.
+- Cosmic-cat galaxy animation uses a transform-translate keyframe so it
+  composites correctly even though it lives inside an SVG `<g>` whose
+  parent already has a translate. The keyframe re-applies the
+  translation explicitly.
 
 ## Tests
 
-- `npm test` — 89 passing across 6 files (unchanged set; no domain
-  changes).
-- `npm run build` — passes. Bundle: 440 kB JS (133 kB gzipped),
-  82 kB CSS (15 kB gzipped).
+- `npm test` — 92 passing across 6 files.
+- `npm run build` — passes. Bundle: 454 kB JS (137 kB gzipped),
+  86 kB CSS (16 kB gzipped).
 
 ## Dev Server
 

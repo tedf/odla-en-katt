@@ -86,12 +86,53 @@
   );
 }
 .seed-card.rarity-mythic {
-  border-left-color: var(--rarity-mythic);
+  position: relative;
+  border-left-color: #ff00ff;
   background: linear-gradient(
     90deg,
-    var(--color-surface),
-    rgba(248, 187, 208, 0.22)
+    var(--color-surface) 0%,
+    rgba(248, 187, 208, 0.28) 60%,
+    rgba(218, 112, 214, 0.22) 100%
   );
+  box-shadow:
+    0 0 0 1px rgba(218, 112, 214, 0.35),
+    0 10px 24px -12px rgba(255, 0, 255, 0.55),
+    inset 0 0 22px rgba(218, 112, 214, 0.16);
+}
+
+.seed-card.rarity-mythic::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  padding: 2px;
+  background: linear-gradient(
+    115deg,
+    rgba(255, 0, 255, 0.65),
+    rgba(218, 112, 214, 0.5),
+    rgba(248, 187, 208, 0.55),
+    rgba(218, 112, 214, 0.5),
+    rgba(255, 0, 255, 0.65)
+  );
+  background-size: 300% 100%;
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+          mask-composite: exclude;
+  pointer-events: none;
+  animation: mythic-border 6s linear infinite;
+}
+
+@keyframes mythic-border {
+  0% { background-position: 0% 0; }
+  100% { background-position: 300% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .seed-card.rarity-mythic::before {
+    animation: none;
+  }
 }
 
 .seed-card.locked {
@@ -721,4 +762,128 @@
 .shop-lottery-shortcut:hover {
   transform: translateY(-2px);
   background: linear-gradient(135deg, #fff5e3, #ffcc88);
+}
+
+/* ---- "Nästa mål" preview / locked upgrade preview ---- */
+.upgrade-card.next-goal {
+  border-left-color: var(--color-coin-deep);
+  background: linear-gradient(
+    90deg,
+    var(--color-surface) 0%,
+    rgba(255, 213, 107, 0.18) 100%
+  );
+}
+
+.upgrade-next-pill {
+  display: inline-block;
+  margin-top: 6px;
+  padding: 2px 9px 3px;
+  border-radius: var(--radius-pill);
+  background: var(--color-coin);
+  color: #6f4612;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 0.62rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.upgrade-card-locked {
+  display: grid;
+  grid-template-columns: 56px 1fr auto;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: 10px 12px;
+  background: rgba(154, 142, 176, 0.08);
+  border-radius: var(--radius-md);
+  border-left: 5px dashed rgba(154, 142, 176, 0.45);
+  opacity: 0.85;
+}
+
+.upgrade-card-locked .upgrade-name {
+  color: var(--color-text-soft);
+}
+
+.upgrade-tier-locked {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  opacity: 0.6;
+}
+
+.upgrade-locked-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 10px;
+  border-radius: var(--radius-pill);
+  background: rgba(154, 142, 176, 0.18);
+  color: var(--color-text-soft);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* ---- Verktyg tab — mystery & locked-by-cost cards ---- */
+.utility-card.utility-mystery {
+  background: repeating-linear-gradient(
+    45deg,
+    rgba(154, 142, 176, 0.08) 0 6px,
+    rgba(154, 142, 176, 0.04) 6px 12px
+  );
+  border: 1.5px dashed rgba(154, 142, 176, 0.5);
+  box-shadow: none;
+  filter: grayscale(0.4);
+}
+
+.utility-mystery-emoji {
+  background: rgba(154, 142, 176, 0.18);
+  color: var(--color-text-soft);
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 1.6rem;
+}
+
+.utility-mystery .utility-name,
+.utility-mystery .utility-desc {
+  color: var(--color-text-soft);
+}
+
+.utility-mystery-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: var(--radius-pill);
+  background: rgba(58, 45, 79, 0.08);
+  color: var(--color-text-soft);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.utility-buy-locked {
+  background: linear-gradient(180deg, #b9aacf 0%, #8e7daf 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.25),
+    0 3px 0 #6c5b8a;
+  cursor: not-allowed;
+  opacity: 0.85;
+}
+
+.utility-next-hint {
+  margin-top: var(--space-sm);
+  padding: 8px 12px;
+  border-radius: var(--radius-pill);
+  background: rgba(255, 213, 107, 0.18);
+  color: #8b6a16;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.78rem;
+  text-align: center;
 }

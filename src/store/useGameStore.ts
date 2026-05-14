@@ -43,8 +43,14 @@ import {
 import {
   activeMultiplier,
   getUpgradeById,
+  hasCatWhisperer,
+  luckyMagicalBias,
   makeActiveUpgrade,
+  offlineTimeMultiplier,
   pruneExpired,
+  seedInventoryCap,
+  sellValueMultiplier,
+  weatherProbabilityMultipliers,
   type ActiveSpeedUpgrade,
   type SpeedUpgradeId,
   type UtilityUpgradeId,
@@ -400,13 +406,15 @@ function bootstrapInitialState(): InitialStateFields {
 
   // Offline catch-up with personalities, auto-harvest support, etc.
   const activeOnLoad = pruneExpired(save.activeSpeedUpgrade, now);
-  const speedMult = activeMultiplier(activeOnLoad, now);
+  const baseSpeedMult = activeMultiplier(activeOnLoad, now);
+  // Time capsule doubles offline-time math on top of any active boost.
+  const offlineMult = baseSpeedMult * offlineTimeMultiplier(save.utilityUpgrades);
   const autoHarvest = save.utilityUpgrades.includes('auto_harvest');
   const summary = calculateOfflineProgress(
     unlockedPlots,
     save.lastTickAt,
     now,
-    speedMult,
+    offlineMult,
     autoHarvest,
   );
 
@@ -613,9 +621,12 @@ export const useGameStore = create<GameState>((set, get) => ({
 
     let weatherFired: WeatherEvent | null = null;
     if (growingIndices.length > 0) {
+      const weatherMults = weatherProbabilityMultipliers(state.utilityUpgrades);
       const event: WeatherEvent | null = rollAnyWeatherEvent(
         weatherCooldowns,
         now,
+        Math.random,
+        weatherMults,
       );
       if (event) {
         const pickIdx =
@@ -770,9 +781,21 @@ export const useGameStore = create<GameState>((set, get) => ({
 
     const baseValue = effectiveSellValue(plot);
     const catId = plot.catType;
-    const { name, traitId } = rollPersonality();
+    const utilities = state.utilityUpgrades;
+    const personality = rollPersonality(Math.random, {
+      luckyMagicalBias: luckyMagicalBias(utilities),
+      rollExtraTrait: hasCatWhisperer(utilities),
+    });
+    const { name, traitId, extraTraitId } = personality;
     const traitMult = traitValueMultiplier(traitId);
-    const value = Math.max(0, Math.round(baseValue * traitMult));
+    // cat_whisperer: second trait stacks multiplicatively on value.
+    const extraTraitMult = extraTraitId ? traitValueMultiplier(extraTraitId) : 1;
+    // golden_watering_can: +10% on every sale.
+    const utilityMult = sellValueMultiplier(utilities);
+    const value = Math.max(
+      0,
+      Math.round(baseValue * traitMult * extraTraitMult * utilityMult),
+    );
     const newCoins = state.coins + value;
     const newTotalEarned = state.totalEarned + value;
 
@@ -937,9 +960,24 @@ export const useGameStore = create<GameState>((set, get) => ({
     if (!state.unlockedCatTypes.includes(catType)) return false;
     if (state.coins < cat.seedCost) return false;
 
+    // Respect inventory cap (5 base, 10 with `extra_seed_slot`).
+    const cap = seedInventoryCap(state.utilityUpgrades);
+    const have = state.seedInventory[catType] ?? 0;
+    if (have >= cap) {
+      set({
+        toasts: pushToast(
+          state.toasts,
+          'info',
+          `Fröpåsen är full`,
+          `Max ${cap} ${cat.name}-frön åt gången`,
+        ),
+      });
+      return false;
+    }
+
     const newInv: Record<CatTypeId, number> = {
       ...state.seedInventory,
-      [catType]: (state.seedInventory[catType] ?? 0) + 1,
+      [catType]: have + 1,
     };
 
     set({

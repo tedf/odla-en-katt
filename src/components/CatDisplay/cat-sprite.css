@@ -47,3 +47,51 @@
     animation: none;
   }
 }
+
+/* ---- Cosmic cat (mythic) ----
+ * Spiral galaxy slowly rotates on the belly; orbiting particles drift.
+ * Effects are subtle to avoid distraction in the shop list.
+ */
+.cosmic-galaxy {
+  transform-box: fill-box;
+  transform-origin: center center;
+  animation: cosmic-spin 18s linear infinite;
+}
+
+@keyframes cosmic-spin {
+  to {
+    transform: translate(60px, 80px) rotate(360deg);
+  }
+}
+
+.cosmic-particles circle {
+  animation: cosmic-drift 5s ease-in-out infinite;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.cosmic-particles circle:nth-child(2) { animation-delay: 0.4s; animation-duration: 6s; }
+.cosmic-particles circle:nth-child(3) { animation-delay: 0.8s; animation-duration: 4.5s; }
+.cosmic-particles circle:nth-child(4) { animation-delay: 1.2s; animation-duration: 5.5s; }
+.cosmic-particles circle:nth-child(5) { animation-delay: 1.6s; animation-duration: 6.5s; }
+.cosmic-particles circle:nth-child(6) { animation-delay: 2.0s; animation-duration: 5s; }
+.cosmic-particles circle:nth-child(7) { animation-delay: 2.4s; animation-duration: 7s; }
+.cosmic-particles circle:nth-child(8) { animation-delay: 2.8s; animation-duration: 4.8s; }
+
+@keyframes cosmic-drift {
+  0%, 100% {
+    transform: translate(0, 0) scale(1);
+    opacity: 0.85;
+  }
+  50% {
+    transform: translate(-3px, -4px) scale(1.4);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cosmic-galaxy,
+  .cosmic-particles circle {
+    animation: none;
+  }
+}
