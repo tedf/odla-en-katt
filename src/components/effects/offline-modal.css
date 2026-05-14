@@ -11,7 +11,7 @@
       rgba(31, 22, 49, 0.85) 100%
     );
   backdrop-filter: blur(10px);
-  z-index: 1100;
+  z-index: var(--z-offline-modal, 1200);
   display: grid;
   place-items: end center;
   padding: var(--space-md);

@@ -5,6 +5,7 @@
  */
 
 import { AnimatePresence, motion } from 'framer-motion';
+import { createPortal } from 'react-dom';
 import { useGameStore } from '../../store/useGameStore';
 import { CAT_TYPES } from '../../domain/catTypes';
 import type { HarvestReveal as HarvestRevealData } from '../../store/useGameStore';
@@ -29,12 +30,13 @@ export function HarvestReveal() {
 
   if (reduced) return null;
 
-  return (
+  return createPortal(
     <AnimatePresence>
       {reveal && (
         <RevealLayer key={reveal.id} reveal={reveal} onDone={clear} />
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body,
   );
 }
 

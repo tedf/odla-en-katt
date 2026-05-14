@@ -13,6 +13,7 @@
 
 import { motion, AnimatePresence } from 'framer-motion';
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   isFreeSpinAvailable,
   LOTTERY_SECTORS,
@@ -181,11 +182,17 @@ export function LotteryWheel({ onClose }: LotteryWheelProps) {
         </span>
       </div>
 
-      <AnimatePresence>
-        {showResult && lastSpin !== null && (
-          <PrizeModal sectorIndex={lastSpin.sectorIndex} onClaim={handleClaim} />
-        )}
-      </AnimatePresence>
+      {createPortal(
+        <AnimatePresence>
+          {showResult && lastSpin !== null && (
+            <PrizeModal
+              sectorIndex={lastSpin.sectorIndex}
+              onClaim={handleClaim}
+            />
+          )}
+        </AnimatePresence>,
+        document.body,
+      )}
     </section>
   );
 }

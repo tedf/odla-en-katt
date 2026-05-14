@@ -9,6 +9,7 @@ import {
   effectiveSellValue,
   growthProgress,
   growthStage,
+  isMature,
   plotUnlockThreshold,
   timeRemaining,
   type PlotState,
@@ -56,9 +57,18 @@ export function PlotCard({ plot }: PlotCardProps) {
 
   useEffect(() => {
     if (plot.state !== 'growing') return;
-    const id = window.setInterval(() => setNow(Date.now()), 250);
+    const id = window.setInterval(() => {
+      const next = Date.now();
+      setNow(next);
+      // When the local timer detects maturity, the store's 1s tick may
+      // not have run yet — proactively fire one so the harvest button
+      // appears immediately instead of after a refresh.
+      if (isMature(plot, next, speedMult)) {
+        useGameStore.getState().tick();
+      }
+    }, 250);
     return () => window.clearInterval(id);
-  }, [plot.state]);
+  }, [plot, speedMult]);
 
   const handleClick = () => {
     if (!plot.unlocked) return;

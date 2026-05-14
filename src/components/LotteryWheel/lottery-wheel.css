@@ -149,7 +149,7 @@
   inset: 0;
   background: rgba(58, 45, 79, 0.45);
   backdrop-filter: blur(6px);
-  z-index: 1100;
+  z-index: var(--z-lottery-result, 800);
   display: grid;
   place-items: center;
   padding: var(--space-md);

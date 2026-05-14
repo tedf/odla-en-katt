@@ -5,6 +5,7 @@
  */
 
 import { motion, AnimatePresence } from 'framer-motion';
+import { createPortal } from 'react-dom';
 import { CAT_TYPES } from '../../domain/catTypes';
 import { CAT_TRAITS_BY_ID } from '../../domain/catPersonality';
 import { useGameStore } from '../../store/useGameStore';
@@ -16,7 +17,7 @@ export function OfflineModal() {
   const accept = useGameStore((s) => s.acceptOfflineHarvest);
   const dismiss = useGameStore((s) => s.dismissOfflineSummary);
 
-  return (
+  return createPortal(
     <AnimatePresence>
       {summary && (
         <motion.div
@@ -137,7 +138,8 @@ export function OfflineModal() {
           </motion.div>
         </motion.div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body,
   );
 }
 

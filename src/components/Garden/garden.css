@@ -62,13 +62,14 @@
 .garden-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
-  gap: var(--space-sm);
+  gap: 14px;
+  padding: 12px;
 }
 
 @media (min-width: 420px) {
   .garden-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: var(--space-md);
+    gap: 14px;
   }
 }
 
@@ -82,10 +83,11 @@
   .garden-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 16px;
+    padding: 16px;
   }
   .plot-card {
     aspect-ratio: auto;
-    min-height: 180px;
+    min-height: 200px;
   }
 }
 
@@ -93,9 +95,10 @@
   .garden-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 20px;
+    padding: 18px;
   }
   .plot-card {
-    min-height: 200px;
+    min-height: 210px;
   }
 }
 
@@ -169,6 +172,7 @@
 .plot-card {
   position: relative;
   aspect-ratio: 1 / 1;
+  padding: 14px 12px 16px;
   border-radius: var(--radius-lg);
   background: radial-gradient(
     140% 90% at 50% 10%,
@@ -248,8 +252,8 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  padding: var(--space-sm);
+  gap: 10px;
+  padding: 6px;
   width: 100%;
   height: 100%;
 }
@@ -332,13 +336,13 @@
 
 .plot-growing-meta {
   position: absolute;
-  inset: auto 10px 10px 10px;
+  inset: auto 12px 12px 12px;
   z-index: 2;
   background: rgba(255, 255, 255, 0.92);
   border-radius: var(--radius-md);
-  padding: 6px 8px;
+  padding: 7px 10px 8px;
   display: grid;
-  gap: 4px;
+  gap: 6px;
   font-size: var(--text-micro);
 }
 
@@ -364,6 +368,7 @@
 .plot-bar {
   width: 100%;
   height: 6px;
+  margin: 4px 0 2px;
   border-radius: 999px;
   background: rgba(0, 0, 0, 0.08);
   overflow: hidden;
@@ -383,7 +388,7 @@
 
 .plot-ready-cta {
   position: absolute;
-  inset: auto 10px 10px 10px;
+  inset: auto 12px 12px 12px;
   z-index: 2;
   display: flex;
   align-items: center;
@@ -1097,7 +1102,7 @@
   inset: 0;
   background: rgba(58, 45, 79, 0.45);
   backdrop-filter: blur(6px);
-  z-index: 1000;
+  z-index: var(--z-plant-sheet, 1000);
   display: grid;
   place-items: end center;
   padding: var(--space-md);

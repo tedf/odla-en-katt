@@ -6,6 +6,7 @@
 
 import { AnimatePresence, motion } from 'framer-motion';
 import { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import type { FireworksBurst } from '../../store/useGameStore';
 import { useGameStore } from '../../store/useGameStore';
 import { useReducedMotion } from '../../hooks/useReducedMotion';
@@ -20,7 +21,7 @@ export function Fireworks() {
 
   if (reduced) return null;
 
-  return (
+  return createPortal(
     <div className="fireworks-layer" aria-hidden="true">
       <AnimatePresence>
         {fireworks.map((burst) => (
@@ -31,7 +32,8 @@ export function Fireworks() {
           />
         ))}
       </AnimatePresence>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

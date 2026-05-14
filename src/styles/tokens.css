@@ -91,6 +91,24 @@
 
   /* ---- Effects ---- */
   --grain-opacity: 0.04;
+
+  /* ---- Z-index scale ----
+     Centralised so overlays don't fight ad-hoc stacking contexts.
+     Anything full-screen should portal to <body> and use one of the
+     overlay tokens below. */
+  --z-base: 0;
+  --z-above: 1;
+  --z-panel: 10;
+  --z-dropdown: 100;
+  --z-modal-backdrop: 500;
+  --z-modal: 600;
+  --z-toast: 700;
+  --z-lottery-result: 800;
+  --z-harvest-reveal: 900;
+  --z-plant-sheet: 1000;
+  --z-fireworks: 1100;
+  --z-offline-modal: 1200;
+  --z-top: 9999;
 }
 
 @media (prefers-reduced-motion: reduce) {
