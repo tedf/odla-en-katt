@@ -253,6 +253,7 @@ export function SkyBackground() {
       </div>
 
       <div className="sky-vignette" />
+      <div className="sky-ground-overlay" />
     </div>
   );
 }

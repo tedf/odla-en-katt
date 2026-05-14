@@ -89,6 +89,9 @@
     aspect-ratio: auto;
     min-height: 200px;
   }
+  .plot-card.locked {
+    min-height: 140px;
+  }
 }
 
 @media (min-width: 1280px) {
@@ -99,6 +102,9 @@
   }
   .plot-card {
     min-height: 210px;
+  }
+  .plot-card.locked {
+    min-height: 150px;
   }
 }
 
@@ -203,13 +209,17 @@
     inset 0 -8px 0 rgba(70, 50, 90, 0.18),
     inset 0 2px 0 rgba(255, 255, 255, 0.4),
     0 6px 14px -6px rgba(102, 71, 122, 0.3);
+  /* Locked cards are quieter placeholders, not bold CTAs. */
+  min-height: 140px;
+  opacity: 0.72;
+  padding: 10px;
 }
 
 .plot-card::before {
   content: '';
   position: absolute;
   inset: 6px;
-  border-radius: 18px;
+  border-radius: var(--radius-card);
   background: radial-gradient(
     100% 90% at 50% 15%,
     rgba(255, 255, 255, 0.15),
@@ -286,6 +296,31 @@
   transform: scale(1.08) rotate(8deg);
 }
 
+/* Pulsing halo around the plus button on empty plots draws the eye
+   when the player has soil ready but no seed planted. */
+.plot-card.is-empty:not(.locked) .plus-circle {
+  animation: empty-plot-pulse 2.4s ease-in-out infinite;
+}
+
+@keyframes empty-plot-pulse {
+  0%, 100% {
+    box-shadow:
+      0 4px 0 rgba(58, 45, 79, 0.15),
+      0 0 0 0 rgba(255, 143, 163, 0.5);
+  }
+  50% {
+    box-shadow:
+      0 4px 0 rgba(58, 45, 79, 0.15),
+      0 0 0 10px rgba(255, 143, 163, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .plot-card.is-empty:not(.locked) .plus-circle {
+    animation: none;
+  }
+}
+
 .plot-empty-label {
   font-family: var(--font-display);
   font-weight: 600;
@@ -304,15 +339,14 @@
 }
 
 .plot-locked .lock-icon {
-  width: 40px;
-  height: 40px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
-  background: white;
+  background: rgba(255, 255, 255, 0.55);
   display: grid;
   place-items: center;
-  box-shadow:
-    0 0 0 3px rgba(255, 255, 255, 0.55),
-    0 4px 10px -2px rgba(58, 45, 79, 0.35);
+  box-shadow: 0 2px 6px rgba(58, 45, 79, 0.12);
+  font-size: 0.9rem;
 }
 
 .plot-locked-threshold {
@@ -323,8 +357,9 @@
 }
 
 .plot-locked-sub {
-  font-size: var(--text-micro);
-  color: var(--color-text-soft);
+  font-size: 0.78rem;
+  color: var(--color-text);
+  font-weight: 600;
 }
 
 .plot-growing-stage {
@@ -367,11 +402,12 @@
 
 .plot-bar {
   width: 100%;
-  height: 6px;
+  height: 8px;
   margin: 4px 0 2px;
   border-radius: 999px;
   background: rgba(0, 0, 0, 0.08);
   overflow: hidden;
+  box-shadow: inset 0 1px 3px rgba(58, 45, 79, 0.10);
 }
 
 .plot-bar > span {
@@ -760,7 +796,7 @@
 /* Lightning: yellow electric border */
 .plot-card.fx-lightning .plot-inner {
   box-shadow: 0 0 0 3px rgba(252, 211, 77, 0.85), 0 0 22px rgba(252, 211, 77, 0.55);
-  border-radius: 18px;
+  border-radius: var(--radius-card);
 }
 
 /* Tornado: spinning aura */
@@ -783,7 +819,7 @@
 /* Ice: cold shimmer */
 .plot-card.fx-ice .plot-inner {
   box-shadow: 0 0 0 3px rgba(186, 230, 253, 0.9), 0 0 28px rgba(125, 211, 252, 0.55);
-  border-radius: 18px;
+  border-radius: var(--radius-card);
 }
 
 .plot-card.fx-ice::before {
@@ -798,13 +834,13 @@
 /* Rain: green-blue glow */
 .plot-card.fx-rain .plot-inner {
   box-shadow: 0 0 0 3px rgba(110, 231, 183, 0.75), 0 0 22px rgba(6, 95, 70, 0.45);
-  border-radius: 18px;
+  border-radius: var(--radius-card);
 }
 
 /* Snow: pale glow */
 .plot-card.fx-snow .plot-inner {
   box-shadow: 0 0 0 3px rgba(224, 242, 254, 0.85), 0 0 22px rgba(186, 230, 253, 0.45);
-  border-radius: 18px;
+  border-radius: var(--radius-card);
 }
 
 /* Meteor: intense orange-red */
@@ -812,7 +848,7 @@
   box-shadow:
     0 0 0 4px rgba(254, 215, 170, 0.85),
     0 0 36px rgba(220, 38, 38, 0.7);
-  border-radius: 18px;
+  border-radius: var(--radius-card);
 }
 
 .plot-card.fx-meteor {

@@ -17,6 +17,32 @@
   }
 }
 
+/* Compact mobile HUD — at <=480px, tighten paddings, shrink the action
+   buttons, and hide the unlock-hint progress bar (it duplicates the
+   garden-section unlock progress that lives below). */
+@media (max-width: 480px) {
+  .hud {
+    padding: var(--space-sm) var(--space-md);
+    gap: var(--space-xs);
+  }
+  .hud-coins {
+    column-gap: 8px;
+  }
+  .hud-coins-sub {
+    font-size: 0.62rem;
+  }
+  .hud-actions {
+    gap: 6px;
+  }
+  .hud-action {
+    padding: 8px 12px 10px;
+    font-size: 0.82rem;
+  }
+  .hud-hint {
+    display: none;
+  }
+}
+
 .hud-coins {
   display: grid;
   grid-template-columns: auto 1fr;

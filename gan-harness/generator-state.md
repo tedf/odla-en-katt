@@ -1,170 +1,120 @@
-# Generator State — Iteration 004 (day/night, parallax, Kattpedia, plot particles)
+# Generator State — Iteration 005 (UX audit fixes)
 
-## What Was Built This Iteration
+## What Was Built / Changed This Iteration
 
-### Feature 1 — Animated Day/Night Cycle
+Applied the top-10 fixes from `gan-harness/screenshots/ux-audit/AUDIT.md`
+to tame the page gradient, calm the locked plots, give the Kattpedia
+real information density, fix the lottery wheel readability, add empty
+states, bump contrast, and align tokens.
 
-New files:
-- `src/hooks/useDayNight.ts` — drives a 10-minute (600s) sky cycle:
-  - Dawn 0–15% (90s), Day 15–55% (240s), Sunset 55–75% (120s),
-    Night 75–100% (150s).
-  - Anchors the cycle to `Date.now() % 600_000` so reloads pick up
-    where they were.
-  - Returns `phase`, `progress` (0..1 within the phase), `cycleProgress`
-    (0..1 across the full cycle), and `cssVars` (`--ambient-tint`,
-    `--surface-warmth`, `--sky-vignette`).
-  - Companion `phaseLabel()` returns `{emoji, label}` in Swedish.
-- `src/components/effects/SkyBackground.tsx` + `sky-background.css` —
-  fixed full-viewport layer at `z-index: -1`:
-  - Four stacked gradient layers (dawn / day / sunset / night) cross-fade
-    via an 8s ease opacity transition.
-  - 48 procedurally generated, deterministic stars with stagger-twinkle
-    keyframes; fade in for sunset/night, out for dawn.
-  - 4 drifting clouds (80s–130s linear) visible during dawn/day.
-  - 80px sun arcing across day phase (sine ease); 60px moon with craters
-    arcing across night.
-  - Vignette layer driven by `--sky-vignette` for a phase-aware bottom
-    glow.
-- `App.tsx`:
-  - Replaced inline `.app-deco` decoration with `<SkyBackground />`.
-  - Applies `cssVars` to `.app-shell` style + `data-phase` attribute
-    for theming hooks.
-  - Renders a `.phase-chip` indicator in the header
-    (🌅 Gryning / ☀️ Dag / 🌇 Solnedgång / 🌙 Natt) with phase-tinted
-    pill backgrounds.
-- `App.css`:
-  - Removed the static `.app-deco` block, replaced with an
-    `.app-shell::after` ambient tint overlay that crossfades over 8s.
-  - Added `.phase-chip` styles (4 phase variants); hides the label on
-    very narrow screens (<=480px).
+### Fix 1 — Tame the background gradient
+- `src/components/effects/SkyBackground.tsx`: appended an opaque
+  `<div className="sky-ground-overlay" />` inside the sky container.
+- `src/components/effects/sky-background.css`: new `.sky-ground-overlay`
+  rule fades from transparent at 30% viewport height to
+  `rgba(255, 244, 230, 1)` at 80%, so panels sit on warm cream rather
+  than raw orange-magenta gradient.
+- `src/App.css`: `.app-body` now has a warm cream wash; at desktop
+  breakpoints it gains a `--radius-lg` corner radius and an 8/12/12px
+  margin, replacing the prior "panels floating on rainbow" feel.
 
-### Feature 2 — Mouse Parallax
+### Fix 2 — Locked plot card visual hierarchy
+- `src/components/Garden/garden.css`:
+  - `.plot-card.locked`: `min-height: 140px`, `opacity: 0.72`,
+    `padding: 10px` (was 200/210px and full opacity).
+  - Desktop `min-height` override at 900px (140px) and 1280px (150px).
+  - `.plot-locked .lock-icon`: 28×28 (was 40), translucent white
+    background, smaller shadow.
+  - `.plot-locked-sub`: 0.78rem at `--color-text` weight 600 (legible).
+  - New `empty-plot-pulse` keyframe on `.plot-card.is-empty .plus-circle`
+    draws the eye to the action; respects `prefers-reduced-motion`.
 
-New file:
-- `src/hooks/useParallax.ts` — returns smoothed normalized pointer
-  position (-1..1) scaled by `strength`. Uses `requestAnimationFrame`
-  with a 0.12 easing factor; throttled state updates only when delta
-  > 0.002. Honors `useReducedMotion()` (returns `{0,0}`) and the
-  `(pointer: fine)` media query (touch returns `{0,0}`).
+### Fix 3 — Kattpedia: rarity groups + unlock teaser + tint
+- `src/components/Kattpedia/Kattpedia.tsx`:
+  - Added `RARITY_ORDER` and `RARITY_SILHOUETTE_TINT` constants.
+  - Grouped the flat grid into per-rarity sections with section
+    headers showing "Vanlig 1/3", "Ovanlig 0/4", etc.
+  - Added an `unlockHint(cat)` helper that returns "Låses upp vid X
+    mynt" or "Sälj X Gräskatter" derived from `CAT_TYPES[id].unlock`,
+    rendered as `.kattpedia-card-hint` under each locked card.
+  - Each card now passes `--card-silhouette-tint` so locked silhouettes
+    tint in the rarity's accent rather than appearing identical-grey.
+- `src/components/Kattpedia/kattpedia.css`:
+  - New `.kattpedia-groups`, `.kattpedia-group-head`,
+    `.kattpedia-group-label` styles. Group label uses per-rarity
+    background colours (mythic = pink→purple gradient).
+  - Rarity badges bumped to 0.72rem, weight 800, full-saturation
+    backgrounds (`#c8e6c9` common, `#b3e5fc` uncommon, `#ce93d8` rare,
+    `#ffa726` epic, `#ffd54f` legendary, mythic = gradient).
+  - Added `.kattpedia-card-hint` legibility rule.
 
-Wiring:
-- `SkyBackground.tsx`: stars use `useParallax(8)`, clouds use
-  `useParallax(15)`. Applied via `translate3d`.
-- `AmbientGarden.tsx`: butterflies/leaves use `useParallax(20)`
-  (y-axis dampened to 0.6 of the strength) on the layer root.
-- `Garden.tsx`: the `.garden-grid` itself uses `useParallax(3)` for
-  subtle foreground depth.
+### Fix 4 — Lottery wheel labels readable
+- `src/components/LotteryWheel/LotteryWheel.tsx`:
+  - Wheel labels are now SHORT only: coin amount or 🌱 (no truncated
+    Swedish prize names colliding on the rim).
+  - Bumped SVG `fontSize` to 15, weight 800.
+  - Added a `.wheel-legend` UL below the spin button — a 2-column grid
+    of coloured dots + full prize names ("100 mynt", "Mysteriefrö").
+- `src/components/LotteryWheel/lottery-wheel.css`: new `.wheel-legend*`
+  styles (warm panel, ellipsis overflow, dot keyed to sector colour).
 
-### Feature 3 — Kattpedia (replaces "Stall")
+### Fix 5 — Empty state for Mina frön (Stall) tab
+- `src/components/Shop/Shop.tsx`: extracted `<StallTab>` component.
+  When the player owns only `graskatt` (the infinite freebie) the tab
+  shows a 🌱 illustration + "Inga sällsynta frön ännu" + a one-line
+  pointer to Butik/Lyckohjulet, instead of a near-empty list floating
+  on gradient.
+- `src/components/Shop/shop.css`: new `.shop-empty-state*` styles.
 
-New files:
-- `src/components/Kattpedia/Kattpedia.tsx` + `kattpedia.css` —
-  collection screen with two views:
-  - **Grid**: `repeat(auto-fill, minmax(160–170px, 1fr))` of cards.
-    Each card shows: 80px CatSprite (glowing for non-common cats),
-    Swedish name (or "??? Okänd katt" silhouette if not yet
-    harvested), a per-rarity badge, and a "×N" total-grown badge.
-  - **Detail**: opens via `motion.div layoutId` spring transition,
-    fills the panel, shows: 160px CatSprite with halo + radial glow,
-    rarity badge in oversized type, flavor description, Swedish lore
-    paragraph in a left-bordered quote, three stat blocks (growth
-    time, sell value, seed cost), and a "Din historia med X" panel
-    with 6 personal stats (count grown, total earned, best weather
-    bonus, top-rolled trait, last-named cat, seed inventory).
-  - Mythic detail view triggers a 14-mote particle burst expanding
-    out from the centre.
-  - Back button uses inverse `layoutId` animation.
-- Rarity shimmer (CSS):
-  - **common** — no shimmer
-  - **uncommon** — soft silver linear shimmer sweep, 5s
-  - **rare** — blue/purple linear shimmer sweep, 4.2s
-  - **epic** — gold conic-gradient border with rotating ray shimmer,
-    9s
-  - **legendary** — rainbow conic-gradient border with pulse +
-    sweep shimmer
-  - **mythic** — magenta/cyan conic border with blur-glow halo +
-    overlay shimmer; the detail view additionally fires a 14-mote
-    burst on open
-- `App.tsx`: the "stall" panel slot now renders `<Kattpedia />` in
-  place of the old `<CatDisplay />`. (CatDisplay file is kept but
-  unused.)
-- `src/domain/catTypes.ts`: added a `lore: string` field to the
-  `CatType` interface and wrote a short, kid-friendly Swedish lore
-  blurb for all 22 cat types.
+### Fix 6 — Drop redundant 0% chip on quests
+- `src/components/Quests/Quests.tsx`: the `.quest-progress-pill` is now
+  only rendered when `pct > 0` (was always shown). The bar + N/M label
+  already communicates 0/2 / 0% — three duplicates was visual noise.
 
-### Feature 4 — Per-Plot Ambient Particles
+### Fix 7 — Tab pill contrast (WCAG AA)
+- `src/App.css`:
+  - `.desktop-tab-bar` background opacity → 0.88 (was 0.6).
+  - `.tab-pill` colour → `--color-text` (was `--color-text-soft`).
+  Active state still uses the pink primary gradient.
 
-New file:
-- `src/components/Garden/PlotParticles.tsx` — renders 6–8 absolutely
-  positioned particle spans inside the plot card while the plot is in
-  the `growing` state. Each particle reads `--particle-color`,
-  `--particle-glow`, `--particle-body`, `--particle-delay`,
-  `--particle-x`, `--particle-size`, `--particle-drift-x` from the
-  cat's palette. Selects a CSS variant per cat species:
-  - `grass` (Gräskatt, Bamboukatt) — leaf shape, accent gradient
-  - `spark` (Morotskatt, Citruskatt, Honeycat, Kokosnötkatt,
-    Thundercat) — radial sparkle with glow
-  - `blob` (Blåbärskatt, Lavendelkatt) — soft blurred berry-blobs
-  - `snow` (Isbjörnkatt) — slow falling rotating dots, 3.2s
-  - `ember` (Vulkankatt, Drakkatt, Phoenixkatt) — orange-red embers
-    with shadow glow, lifted 52px with horizontal drift
-  - `diamond` (Kristallkatt) — rotating diamond outlines with
-    inner-shine
-  - `wisp` (Spökkatt) — translucent blurred wisps, 3.8s
-  - `rainbow` (Regnbågskatt) — conic-gradient + hue-rotate animation
-    cycles through full spectrum, 2.5s
-  - `droplet` (Tidvattenkatt) — teardrop with shadow
-  - `star` (Stjärnkatt, Enhörningskatt) — clip-path star polygon
-    with rotation
-  - `cosmic` (Rymkatt, Kosmisk Katt) — magenta cosmic dust with
-    inner halo
-- For `rymkatt` and `cosmiccat` an additional `.plot-shooting-star`
-  fires diagonally across the plot every ~5.5s.
-- Wired into `PlotCard.tsx` inside `GrowingStage` so particles only
-  appear while plot.state is `growing`.
-- All keyframes added to `garden.css`; `prefers-reduced-motion`
-  disables them.
+### Fix 8 — Compact mobile header + HUD
+- `src/App.css`: at <=480px the subtitle is hidden, the brand mark
+  shrinks to 36px, the title drops to 1.2rem, padding tightens.
+- `src/components/HUD/hud.css`: new `@media (max-width: 480px)` block
+  tightens HUD padding, shrinks action buttons, and hides the
+  `.hud-hint` progress bar (it duplicates the garden-section unlock
+  progress that lives below the garden grid on mobile).
 
-## What Changed This Iteration
+### Fix 9 — Token consistency
+- `src/styles/tokens.css`:
+  - New `--radius-card: 18px`.
+  - New `--shadow-tile` and `--shadow-tab-active`.
+- `border-radius: 18px;` replaced with `var(--radius-card)` across
+  `kattpedia.css` and `garden.css` (sed-replaced, 7 callsites).
 
-- Sky is now a living, looping day/night cycle rather than a single
-  static deco.
-- Headers have a Swedish phase indicator chip with phase-tinted
-  backgrounds.
-- Background layers parallax with the mouse on fine-pointer devices.
-- The Stall tab is now a Pokédex-style Kattpedia with shimmer rarity
-  effects and dramatic Framer Motion layout transitions.
-- Every growing plot now emits species-specific particles, and the
-  Rymkatt / Kosmisk Katt plots have a shooting star.
-- New `lore` field on every cat type drives the Kattpedia detail
-  copy.
+### Fix 10 — Thicker, always-visible progress bars
+- `src/components/Garden/garden.css`: `.plot-bar` height 6→8px with
+  `inset 0 1px 3px rgba(58,45,79,0.10)` so the empty track is always
+  visible against the warm card background.
 
 ## Tests
-
-- `npm test` — 92 passing across 6 files (no test regressions).
-- `npm run build` — clean. Bundle: 471 kB JS (143 kB gzipped),
-  102 kB CSS (19 kB gzipped).
+- `npm run build` — passes with zero TypeScript errors.
+  Bundle: 473 kB JS (143 kB gzipped), 106 kB CSS (20 kB gzipped).
+- `npm test` — all 92 tests passing across 6 files.
+- `npx tsc --noEmit` — clean.
 
 ## Known Issues / Notes
-
-- The old `CatDisplay` component still exists in
-  `src/components/CatDisplay/`. The Kattpedia replaces it from
-  `App.tsx`, but CatDisplay is unused — kept around in case the
-  Evaluator wants to compare or in case some legacy reference needs
-  it.
-- Stars/clouds in `SkyBackground` use a seeded RNG with a fixed seed
-  for deterministic layout. If two reviewers see the same page the
-  star pattern matches.
-- The day/night phase indicator updates on a 1s setInterval; the
-  CSS transitions smooth the visual change. The full cycle is 10
-  minutes — Evaluators briefly visiting the page will likely see one
-  to two phase boundaries.
-- The mouse parallax intentionally returns `{0,0}` on touch devices
-  and respects the in-app `reducedMotion` toggle as well as the OS
-  `prefers-reduced-motion` setting.
+- Pre-existing ESLint react-hooks/purity + react-hooks/refs warnings
+  in `LotteryWheel.tsx` (line 39, 154) were already present before this
+  iteration and are not introduced by the changes here.
+- The lottery wheel legend uses a 2-column auto-fill grid, so at very
+  narrow panel widths (<300px) it may stack to one column. Labels use
+  ellipsis overflow as a safety net.
+- The Kattpedia rarity groups produce 5–6 small sections on a fresh
+  game; once cats are discovered the silhouette tinting + group counts
+  give scannable progress feedback.
 
 ## Dev Server
-
 - URL: `http://localhost:5173`
 - Status: running (HTTP 200 on /).
 - Command: `npm run dev`.

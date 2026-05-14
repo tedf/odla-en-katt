@@ -70,6 +70,58 @@
   font-weight: 600;
 }
 
+/* ---------- Groups ---------- */
+.kattpedia-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  position: relative;
+  z-index: 1;
+}
+
+.kattpedia-group-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+  padding: 0 2px;
+  border-bottom: 1px dashed rgba(58, 45, 79, 0.14);
+  padding-bottom: 6px;
+}
+
+.kattpedia-group-label {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 0.85rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 4px 12px 5px;
+  border-radius: var(--radius-pill);
+  background: rgba(58, 45, 79, 0.06);
+  color: var(--color-text);
+  border: 1px solid rgba(58, 45, 79, 0.08);
+}
+
+.kattpedia-group-label.rarity-common    { background: #e6f4e7; color: #1b5e20; border-color: #c8e6c9; }
+.kattpedia-group-label.rarity-uncommon  { background: #e1f3fc; color: #01579b; border-color: #b3e5fc; }
+.kattpedia-group-label.rarity-rare      { background: #f1e3f8; color: #4a148c; border-color: #ce93d8; }
+.kattpedia-group-label.rarity-epic      { background: #ffe8d3; color: #5d2e00; border-color: #ffb877; }
+.kattpedia-group-label.rarity-legendary { background: #fff2c2; color: #4a3000; border-color: #ffd54f; }
+.kattpedia-group-label.rarity-mythic {
+  background: linear-gradient(90deg, #f06292, #ce93d8);
+  color: white;
+  border-color: transparent;
+}
+
+.kattpedia-group-count {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.82rem;
+  color: var(--color-text-soft);
+  font-variant-numeric: tabular-nums;
+}
+
 /* ---------- Grid ---------- */
 .kattpedia-grid {
   display: grid;
@@ -92,7 +144,7 @@
   align-items: center;
   gap: 10px;
   padding: 16px 12px 14px;
-  border-radius: 18px;
+  border-radius: var(--radius-card);
   background: linear-gradient(
     180deg,
     rgba(255, 255, 255, 0.85) 0%,
@@ -129,7 +181,19 @@
 }
 
 .kattpedia-card.is-locked .kattpedia-unknown {
-  color: rgba(110, 100, 130, 0.55);
+  /* Tint the silhouette in the rarity's accent so locked cards aren't
+     identical grey blobs — a tease of what's coming. */
+  color: var(--card-silhouette-tint, rgba(110, 100, 130, 0.55));
+}
+
+.kattpedia-card-hint {
+  font-size: 0.7rem;
+  color: var(--color-text-soft);
+  line-height: 1.3;
+  font-weight: 600;
+  font-style: normal;
+  padding: 0 4px;
+  text-align: center;
 }
 
 .kattpedia-card-sprite {
@@ -178,11 +242,11 @@
 
 .kattpedia-rarity-badge {
   font-family: var(--font-display);
-  font-weight: 700;
-  font-size: 0.66rem;
+  font-weight: 800;
+  font-size: 0.72rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  padding: 3px 10px;
+  padding: 3px 10px 4px;
   border-radius: var(--radius-pill);
   background: rgba(255, 255, 255, 0.75);
   color: var(--color-text);
@@ -190,34 +254,34 @@
 }
 
 .kattpedia-rarity-badge.rarity-common {
-  background: #e1f5e3;
-  color: #2f6b35;
-  border-color: #c8e6c9;
+  background: #c8e6c9;
+  color: #1b5e20;
+  border-color: #a5d6a7;
 }
 .kattpedia-rarity-badge.rarity-uncommon {
-  background: #d9f0fb;
-  color: #1565a3;
-  border-color: #b3e5fc;
+  background: #b3e5fc;
+  color: #01579b;
+  border-color: #81d4fa;
 }
 .kattpedia-rarity-badge.rarity-rare {
-  background: #ecdff7;
-  color: #5b3994;
-  border-color: #d1c4e9;
+  background: #ce93d8;
+  color: #4a148c;
+  border-color: #ba68c8;
 }
 .kattpedia-rarity-badge.rarity-epic {
-  background: #ffe5d8;
-  color: #b34816;
-  border-color: #ffccbc;
+  background: #ffa726;
+  color: #5d2e00;
+  border-color: #ff8f00;
 }
 .kattpedia-rarity-badge.rarity-legendary {
-  background: #fff2b8;
-  color: #8a6614;
-  border-color: #ffe082;
+  background: #ffd54f;
+  color: #4a3000;
+  border-color: #ffc107;
 }
 .kattpedia-rarity-badge.rarity-mythic {
-  background: linear-gradient(135deg, #f8bbd0, #f0c5ff);
-  color: #6a1b6a;
-  border-color: #f48fb1;
+  background: linear-gradient(90deg, #f06292, #ce93d8);
+  color: white;
+  border-color: transparent;
 }
 
 .kattpedia-card-count {

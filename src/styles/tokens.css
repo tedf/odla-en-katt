@@ -61,6 +61,7 @@
   --radius-xs: 6px;
   --radius-sm: 10px;
   --radius-md: 16px;
+  --radius-card: 18px;
   --radius-lg: 22px;
   --radius-pill: 999px;
 
@@ -81,6 +82,12 @@
   --shadow-floating:
     0 22px 50px -10px rgba(58, 45, 79, 0.35),
     0 4px 0 rgba(58, 45, 79, 0.1);
+  --shadow-tile:
+    inset 0 1px 0 rgba(255, 255, 255, 0.8),
+    0 4px 12px -6px rgba(58, 45, 79, 0.12);
+  --shadow-tab-active:
+    0 3px 0 var(--color-primary-deep),
+    0 6px 12px -2px rgba(217, 107, 127, 0.4);
 
   /* ---- Motion ---- */
   --duration-fast: 150ms;

@@ -120,29 +120,7 @@ export function Shop({ onOpenLottery }: ShopProps = {}) {
         </ul>
       )}
 
-      {tab === 'stall' && (
-        <ul className="shop-list" role="tabpanel">
-          {Object.entries(seedInventory).map(([id, count]) => {
-            const cat = CAT_TYPES[id as CatTypeId];
-            if (!cat) return null;
-            if (count === 0 && !cat.infinite) return null;
-            return (
-              <li key={id} className="shop-stall-row">
-                <CatSprite catType={id as CatTypeId} size={48} wiggle={false} />
-                <div className="shop-stall-info">
-                  <span className="shop-stall-name">{cat.name}</span>
-                  <span className="muted num">
-                    {cat.infinite ? 'Obegränsat' : `${count} frö kvar`}
-                  </span>
-                </div>
-                <span className="shop-stall-count num">
-                  {cat.infinite ? '∞' : `× ${count}`}
-                </span>
-              </li>
-            );
-          })}
-        </ul>
-      )}
+      {tab === 'stall' && <StallTab seedInventory={seedInventory} />}
 
       {tab === 'uppgraderingar' && (
         <UpgradesTab
@@ -165,6 +143,59 @@ export function Shop({ onOpenLottery }: ShopProps = {}) {
         />
       )}
     </section>
+  );
+}
+
+interface StallTabProps {
+  seedInventory: Record<CatTypeId, number>;
+}
+
+/**
+ * Stall (Mina frön) — lists every seed the player owns. Renders an empty
+ * state if the player only has Gräskatt (the infinite freebie).
+ */
+function StallTab({ seedInventory }: StallTabProps) {
+  const hasRareSeeds = Object.entries(seedInventory).some(
+    ([id, count]) => id !== 'graskatt' && count > 0,
+  );
+
+  if (!hasRareSeeds) {
+    return (
+      <div className="shop-empty-state" role="tabpanel">
+        <span className="shop-empty-icon" aria-hidden="true">
+          🌱
+        </span>
+        <p className="shop-empty-title">Inga sällsynta frön ännu</p>
+        <p className="shop-empty-sub">
+          Köp frön i Butik-fliken eller vinn dem på Lyckohjulet — så fylls
+          stallet på här.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <ul className="shop-list" role="tabpanel">
+      {Object.entries(seedInventory).map(([id, count]) => {
+        const cat = CAT_TYPES[id as CatTypeId];
+        if (!cat) return null;
+        if (count === 0 && !cat.infinite) return null;
+        return (
+          <li key={id} className="shop-stall-row">
+            <CatSprite catType={id as CatTypeId} size={48} wiggle={false} />
+            <div className="shop-stall-info">
+              <span className="shop-stall-name">{cat.name}</span>
+              <span className="muted num">
+                {cat.infinite ? 'Obegränsat' : `${count} frö kvar`}
+              </span>
+            </div>
+            <span className="shop-stall-count num">
+              {cat.infinite ? '∞' : `× ${count}`}
+            </span>
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 

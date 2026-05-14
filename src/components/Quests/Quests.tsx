@@ -142,9 +142,9 @@ function QuestCard({ entry, template, onClaim }: QuestCardProps) {
           <button type="button" className="quest-claim-btn" onClick={onClaim}>
             Hämta belöning!
           </button>
-        ) : (
+        ) : pct > 0 ? (
           <span className="quest-progress-pill num">{pct}%</span>
-        )}
+        ) : null}
       </div>
     </motion.li>
   );

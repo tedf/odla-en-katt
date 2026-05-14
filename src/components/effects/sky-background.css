@@ -156,6 +156,24 @@
   }
 }
 
+/* ---- Ground overlay — opaque warm-cream blanket that prevents the
+   raw sky gradient bleeding through panel gutters on the lower portion
+   of the viewport. Sits ABOVE the gradient layers but inside the sky
+   container at z-index -1, so the UI surfaces above it remain crisp. */
+.sky-ground-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    to bottom,
+    transparent 0%,
+    transparent 30%,
+    rgba(255, 244, 230, 0.6) 50%,
+    rgba(255, 244, 230, 0.92) 65%,
+    rgba(255, 244, 230, 1) 80%
+  );
+}
+
 /* ---- Bottom vignette — picks up phase tint for grounding ---- */
 .sky-vignette {
   position: absolute;

@@ -32,6 +32,26 @@ const RARITY_LABEL: Record<Rarity, string> = {
   mythic: 'Mytisk',
 };
 
+/** Section order for the rarity groups. */
+const RARITY_ORDER: readonly Rarity[] = [
+  'common',
+  'uncommon',
+  'rare',
+  'epic',
+  'legendary',
+  'mythic',
+];
+
+/** Soft per-rarity tint used to colour the locked silhouette circle. */
+const RARITY_SILHOUETTE_TINT: Record<Rarity, string> = {
+  common: 'rgba(126, 186, 128, 0.25)',
+  uncommon: 'rgba(100, 181, 246, 0.25)',
+  rare: 'rgba(206, 147, 216, 0.3)',
+  epic: 'rgba(255, 167, 38, 0.3)',
+  legendary: 'rgba(255, 213, 79, 0.35)',
+  mythic: 'rgba(255, 64, 129, 0.35)',
+};
+
 interface PersonalRecord {
   count: number;
   totalEarned: number;
@@ -102,6 +122,25 @@ export function Kattpedia() {
     (id) => (catsSold[id] ?? 0) > 0,
   ).length;
 
+  // Group cats by rarity so the wall of locked silhouettes becomes a real
+  // collection sheet ("Vanlig 1/3", "Ovanlig 0/4", ...).
+  const groupedByRarity = useMemo(() => {
+    const groups: Array<{
+      rarity: Rarity;
+      ids: CatTypeId[];
+      discovered: number;
+    }> = [];
+    for (const rarity of RARITY_ORDER) {
+      const ids = CAT_TYPE_ORDER.filter(
+        (id) => CAT_TYPES[id].rarity === rarity,
+      );
+      if (ids.length === 0) continue;
+      const discovered = ids.filter((id) => (catsSold[id] ?? 0) > 0).length;
+      groups.push({ rarity, ids, discovered });
+    }
+    return groups;
+  }, [catsSold]);
+
   const selectedCat = selected ? CAT_TYPES[selected] : null;
   const selectedRecord = selected ? (records[selected] ?? ZERO_RECORD) : null;
   const selectedSeedCount = selected ? (seedInventory[selected] ?? 0) : 0;
@@ -133,24 +172,44 @@ export function Kattpedia() {
       </header>
 
       <LayoutGroup id="kattpedia">
-        <div className="kattpedia-grid" role="list">
-          {CAT_TYPE_ORDER.map((id) => {
-            const cat = CAT_TYPES[id];
-            const sold = catsSold[id] ?? 0;
-            const unlocked = unlockedTypes.includes(id);
-            const discovered = sold > 0;
-            const record = records[id] ?? ZERO_RECORD;
-            return (
-              <KattpediaCard
-                key={id}
-                cat={cat}
-                unlocked={unlocked}
-                discovered={discovered}
-                record={record}
-                onSelect={() => discovered && setSelected(id)}
-              />
-            );
-          })}
+        <div className="kattpedia-groups">
+          {groupedByRarity.map((group) => (
+            <section
+              key={group.rarity}
+              className={`kattpedia-group rarity-${group.rarity}`}
+              aria-label={RARITY_LABEL[group.rarity]}
+            >
+              <header className="kattpedia-group-head">
+                <span
+                  className={`kattpedia-group-label rarity-${group.rarity}`}
+                >
+                  {RARITY_LABEL[group.rarity]}
+                </span>
+                <span className="kattpedia-group-count num">
+                  {group.discovered}/{group.ids.length}
+                </span>
+              </header>
+              <div className="kattpedia-grid" role="list">
+                {group.ids.map((id) => {
+                  const cat = CAT_TYPES[id];
+                  const sold = catsSold[id] ?? 0;
+                  const unlocked = unlockedTypes.includes(id);
+                  const discovered = sold > 0;
+                  const record = records[id] ?? ZERO_RECORD;
+                  return (
+                    <KattpediaCard
+                      key={id}
+                      cat={cat}
+                      unlocked={unlocked}
+                      discovered={discovered}
+                      record={record}
+                      onSelect={() => discovered && setSelected(id)}
+                    />
+                  );
+                })}
+              </div>
+            </section>
+          ))}
         </div>
 
         <AnimatePresence>
@@ -185,6 +244,7 @@ function KattpediaCard({
   onSelect,
 }: KattpediaCardProps) {
   const layoutId = `kattpedia-card-${cat.id}`;
+  const unlockTeaser = !discovered ? unlockHint(cat) : null;
   return (
     <motion.button
       layoutId={layoutId}
@@ -206,6 +266,7 @@ function KattpediaCard({
           ['--card-accent']: cat.palette.accent,
           ['--card-glow']: cat.palette.glow,
           ['--card-body']: cat.palette.body,
+          ['--card-silhouette-tint']: RARITY_SILHOUETTE_TINT[cat.rarity],
         } as React.CSSProperties
       }
     >
@@ -229,12 +290,29 @@ function KattpediaCard({
         <span className={`kattpedia-rarity-badge rarity-${cat.rarity}`}>
           {RARITY_LABEL[cat.rarity]}
         </span>
+        {unlockTeaser && (
+          <span className="kattpedia-card-hint">{unlockTeaser}</span>
+        )}
       </div>
       {discovered && record.count > 0 && (
         <span className="kattpedia-card-count num">×{record.count}</span>
       )}
     </motion.button>
   );
+}
+
+/**
+ * Returns a short Swedish unlock teaser for a locked cat, derived from
+ * its `unlock` data. Gräskatt has no unlock condition.
+ */
+function unlockHint(cat: CatType): string | null {
+  if (cat.unlock.totalEarned !== null) {
+    return `Låses upp vid ${formatCoins(cat.unlock.totalEarned)} mynt`;
+  }
+  if (cat.unlock.graskattsSold !== null) {
+    return `Sälj ${cat.unlock.graskattsSold} Gräskatter`;
+  }
+  return null;
 }
 
 interface KattpediaDetailProps {

@@ -171,6 +171,19 @@ export function LotteryWheel({ onClose }: LotteryWheelProps) {
             : `Snurra (${cost} mynt)`}
       </button>
 
+      <ul className="wheel-legend" aria-label="Vinster">
+        {LOTTERY_SECTORS.map((sector, i) => (
+          <li key={i} className="wheel-legend-item">
+            <span
+              className="wheel-legend-dot"
+              style={{ background: sector.prize.color }}
+              aria-hidden="true"
+            />
+            <span className="wheel-legend-label">{sector.prize.label}</span>
+          </li>
+        ))}
+      </ul>
+
       <div className="lottery-stats num">
         <span>
           <strong>{lottery.spinsToday}</strong>
@@ -264,6 +277,13 @@ function WheelSvg({ highlightIndex }: WheelSvgProps) {
       })}
       {LOTTERY_SECTORS.map((sector, i) => {
         const pos = labelPos(i);
+        const prize = sector.prize;
+        // Short labels only on the wheel — long names live in the legend
+        // below. Coin sectors show the amount; seed sectors a sprout glyph.
+        const shortLabel =
+          prize.kind === 'coins'
+            ? `${prize.coins ?? 0}`
+            : '🌱';
         return (
           <g
             key={`label-${i}`}
@@ -273,13 +293,11 @@ function WheelSvg({ highlightIndex }: WheelSvgProps) {
               textAnchor="middle"
               dominantBaseline="middle"
               fontFamily="Fredoka, sans-serif"
-              fontWeight="700"
-              fontSize="11"
+              fontWeight="800"
+              fontSize="15"
               fill="#3a2d4f"
             >
-              {sector.prize.label.length > 12
-                ? sector.prize.label.slice(0, 10) + '…'
-                : sector.prize.label}
+              {shortLabel}
             </text>
           </g>
         );
