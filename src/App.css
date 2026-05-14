@@ -240,10 +240,38 @@
   min-width: 0;
 }
 
+/* Right rail always hidden below desktop. */
 @media (max-width: 899px) {
   .panel-right { display: none; }
+}
+
+/* On small phones: hide desktop tab bar and inactive panels. */
+@media (max-width: 679px) {
   .desktop-tab-bar { display: none; }
   .panel-hidden-mobile { display: none; }
+}
+
+/* ---- Tablet 2-column layout (680–899px) ---- */
+/* Both garden and center panel are always visible; no bottom tab bar needed. */
+@media (min-width: 680px) and (max-width: 899px) {
+  .app-body {
+    grid-template-columns: minmax(0, 1.1fr) minmax(300px, 1fr);
+    gap: 12px;
+    padding: 12px 12px 20px;
+    height: auto;
+    overflow: visible;
+  }
+  .panel-main,
+  .panel-center {
+    /* Both panels visible — override any mobile hide */
+    display: flex !important;
+    flex-direction: column;
+  }
+  .panel-center {
+    position: relative;
+    isolation: isolate;
+    z-index: 0;
+  }
 }
 
 /* ---- Desktop tab bar inside the center panel ---- */
@@ -353,7 +381,8 @@
   z-index: 10;
 }
 
-@media (min-width: 900px) {
+/* Bottom tab bar only needed on small phones. */
+@media (min-width: 680px) {
   .app-tabbar { display: none; }
 }
 

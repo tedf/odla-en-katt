@@ -345,7 +345,11 @@ function ReadyStage({ catType, plot }: { catType: CatTypeId; plot: PlotState }) 
 function LockedPlotCard({ index }: { index: number }) {
   const threshold = plotUnlockThreshold(index);
   return (
-    <div className="plot-card locked" aria-label={`Plot ${index + 1} låst`}>
+    <div
+      className="plot-card locked"
+      aria-label={`Plot ${index + 1} låst — kräver ${formatCoins(threshold)} mynt i livstid intjänat`}
+      title={`Kräver ${formatCoins(threshold)} mynt i livstid intjänat`}
+    >
       <div className="plot-locked">
         <span className="lock-icon" aria-hidden="true">
           <LockSvg />
@@ -353,7 +357,6 @@ function LockedPlotCard({ index }: { index: number }) {
         <span className="plot-locked-threshold num">
           {formatCoins(threshold)} mynt
         </span>
-        <span className="plot-locked-sub">i livstid intjänat</span>
       </div>
     </div>
   );

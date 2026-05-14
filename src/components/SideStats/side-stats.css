@@ -201,6 +201,29 @@
   color: var(--color-text-soft);
 }
 
+.trophy-empty {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 0;
+}
+
+.trophy-empty-icon {
+  font-size: 1.5rem;
+  flex-shrink: 0;
+  filter: drop-shadow(0 2px 0 rgba(91, 46, 2, 0.15));
+}
+
+.trophy-empty .muted {
+  font-size: 0.8rem;
+  line-height: 1.4;
+  color: var(--color-text-soft);
+}
+
+.side-stats-boost-hint {
+  font-size: 0.82rem;
+}
+
 .trophy-row {
   display: grid;
   grid-template-columns: 38px 1fr;

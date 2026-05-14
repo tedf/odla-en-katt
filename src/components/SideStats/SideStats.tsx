@@ -30,6 +30,11 @@ export function SideStats() {
   const unlocked = useGameStore((s) => s.unlockedAchievements);
   const plots = useGameStore((s) => s.plots);
   const activeStrike = useGameStore((s) => s.activeStrike);
+  const catsSoldByType = useGameStore((s) => s.catsSoldByType);
+  const totalHarvests = Object.values(catsSoldByType).reduce(
+    (sum, n) => sum + n,
+    0,
+  );
 
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
@@ -79,6 +84,10 @@ export function SideStats() {
             <dd className="num">{formatCoins(totalEarned)}</dd>
           </div>
           <div>
+            <dt>Skördade katter</dt>
+            <dd className="num">{totalHarvests}</dd>
+          </div>
+          <div>
             <dt>Aktiv boost</dt>
             <dd>
               {speedMult > 1 && speedDef ? (
@@ -90,7 +99,9 @@ export function SideStats() {
                   </span>
                 </span>
               ) : (
-                <span className="muted">Ingen boost</span>
+                <span className="muted side-stats-boost-hint">
+                  Ingen boost aktiv
+                </span>
               )}
             </dd>
           </div>
@@ -170,7 +181,10 @@ export function SideStats() {
             </div>
           </div>
         ) : (
-          <p className="muted">Inga trofér än — börja odla!</p>
+          <div className="trophy-empty">
+            <span className="trophy-empty-icon" aria-hidden="true">🌱</span>
+            <span className="muted">Skörda din första katt för att vinna en trofé!</span>
+          </div>
         )}
       </div>
 
@@ -187,8 +201,8 @@ export function SideStats() {
         </header>
         <p>
           {hasActiveWeather
-            ? 'Stormvarning aktiv'
-            : 'Lugnt väder i trädgården'}
+            ? 'Stormvarning aktiv — kolla katterna!'
+            : 'Lugnt väder. Väder-event ger dina katter bonusvärde!'}
         </p>
       </div>
     </aside>
