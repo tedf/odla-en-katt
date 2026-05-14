@@ -8,7 +8,7 @@ import { HUD } from './components/HUD/HUD';
 import { Garden } from './components/Garden/Garden';
 import { Shop } from './components/Shop/Shop';
 import { LotteryWheel } from './components/LotteryWheel/LotteryWheel';
-import { CatDisplay } from './components/CatDisplay/CatDisplay';
+import { Kattpedia } from './components/Kattpedia/Kattpedia';
 import { Quests } from './components/Quests/Quests';
 import { Achievements } from './components/Achievements/Achievements';
 import { SideStats } from './components/SideStats/SideStats';
@@ -20,8 +20,10 @@ import { FloatingCoins } from './components/effects/FloatingCoins';
 import { HarvestReveal } from './components/effects/HarvestReveal';
 import { Fireworks } from './components/effects/Fireworks';
 import { SellPopUp } from './components/effects/SellPopUp';
+import { SkyBackground } from './components/effects/SkyBackground';
 import { useGameTick } from './hooks/useGameTick';
 import { useSoundEffects } from './hooks/useSoundEffects';
+import { useDayNight, phaseLabel } from './hooks/useDayNight';
 import { useGameStore } from './store/useGameStore';
 import './App.css';
 import './components/CatDisplay/cat-sprite.css';
@@ -46,6 +48,7 @@ function App() {
   const toggleSoundMuted = useGameStore((s) => s.toggleSoundMuted);
   const activeStrike = useGameStore((s) => s.activeStrike);
   const { playButton } = useSoundEffects();
+  const dayNight = useDayNight();
   const [mobileTab, setMobileTab] = useState<MobileTab>('garden');
   const [panelTab, setPanelTab] = useState<PanelTab>('shop');
   const [meteorShakeKey, setMeteorShakeKey] = useState(0);
@@ -61,15 +64,17 @@ function App() {
     return undefined;
   }, [activeStrike]);
 
+  const phaseInfo = phaseLabel(dayNight.phase);
+  const shellStyle = dayNight.cssVars as React.CSSProperties;
+
   return (
-    <div className="app-shell" data-reduced-motion={reducedMotion}>
-      <div className="app-deco" aria-hidden="true">
-        <span className="sun" />
-        <span className="cloud cloud-1" />
-        <span className="cloud cloud-2" />
-        <span className="cloud cloud-3" />
-        <span className="meadow" />
-      </div>
+    <div
+      className="app-shell"
+      data-reduced-motion={reducedMotion}
+      data-phase={dayNight.phase}
+      style={shellStyle}
+    >
+      <SkyBackground />
 
       <header className="app-header">
         <div className="app-branding">
@@ -82,6 +87,17 @@ function App() {
           </div>
         </div>
         <div className="app-header-actions">
+          <span
+            className={`phase-chip phase-${dayNight.phase}`}
+            role="status"
+            aria-live="polite"
+            title={`Aktuell fas: ${phaseInfo.label}`}
+          >
+            <span className="phase-chip-emoji" aria-hidden="true">
+              {phaseInfo.emoji}
+            </span>
+            <span className="phase-chip-label">{phaseInfo.label}</span>
+          </span>
           <button
             type="button"
             className="icon-toggle sound-toggle"
@@ -191,7 +207,7 @@ function App() {
               <PanelSlot
                 active={panelTab === 'stall' || mobileTab === 'stall'}
               >
-                <CatDisplay />
+                <Kattpedia />
               </PanelSlot>
             )}
           </div>

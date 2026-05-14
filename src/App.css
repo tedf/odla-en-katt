@@ -9,91 +9,87 @@
   isolation: isolate;
 }
 
-/* ---- Background atmosphere ---- */
-.app-deco {
+/* ---- Day/Night ambient tint overlay ---- */
+/* The SkyBackground component renders the actual sky. This rule lets the
+   --ambient-tint CSS var (driven by useDayNight) bleed a subtle wash over
+   the rest of the UI without darkening text. */
+.app-shell::after {
+  content: '';
   position: fixed;
   inset: 0;
-  z-index: -1;
-  overflow: hidden;
+  z-index: 0;
   pointer-events: none;
+  background: var(--ambient-tint, transparent);
+  mix-blend-mode: multiply;
+  transition: background 8s ease;
 }
 
-.app-deco .sun {
-  position: absolute;
-  top: -120px;
-  right: -120px;
-  width: 360px;
-  height: 360px;
-  border-radius: 50%;
-  background: radial-gradient(
-    closest-side,
-    rgba(255, 213, 107, 0.55),
-    rgba(255, 213, 107, 0) 70%
-  );
-  filter: blur(2px);
+/* Push interactive layers above the ambient tint. */
+.app-shell > header,
+.app-shell > .app-hud-bar,
+.app-shell > main,
+.app-shell > nav {
+  position: relative;
+  z-index: 1;
 }
 
-.app-deco .cloud {
-  position: absolute;
-  background: radial-gradient(
-    closest-side,
-    rgba(255, 255, 255, 0.85),
-    rgba(255, 255, 255, 0) 70%
-  );
-  filter: blur(1px);
-  animation: cloud-drift 90s linear infinite;
+/* ---- Phase chip in the header ---- */
+.phase-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px 7px;
+  border-radius: var(--radius-pill);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.78rem;
+  letter-spacing: 0.02em;
+  background: rgba(255, 255, 255, 0.78);
+  color: var(--color-text);
+  border: 1px solid rgba(58, 45, 79, 0.1);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  transition:
+    background var(--duration-normal, 300ms) ease,
+    color var(--duration-normal, 300ms) ease,
+    border-color var(--duration-normal, 300ms) ease;
 }
 
-.app-deco .cloud-1 {
-  top: 8%;
-  left: 6%;
-  width: 220px;
-  height: 90px;
-}
-.app-deco .cloud-2 {
-  top: 18%;
-  right: 12%;
-  width: 160px;
-  height: 70px;
-  animation-duration: 120s;
-  animation-direction: reverse;
-}
-.app-deco .cloud-3 {
-  top: 40%;
-  left: 30%;
-  width: 280px;
-  height: 110px;
-  opacity: 0.6;
-  animation-duration: 150s;
+.phase-chip-emoji {
+  font-size: 0.9rem;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.1));
 }
 
-@keyframes cloud-drift {
-  0% { transform: translateX(0); }
-  50% { transform: translateX(40px); }
-  100% { transform: translateX(0); }
+.phase-chip.phase-dawn {
+  background: linear-gradient(135deg, #ffe9d6 0%, #ffb7a8 100%);
+  color: #6b2818;
+  border-color: rgba(255, 107, 107, 0.3);
+}
+.phase-chip.phase-day {
+  background: linear-gradient(135deg, #e8f4fd 0%, #b8e4f7 100%);
+  color: #15487a;
+  border-color: rgba(135, 206, 235, 0.4);
+}
+.phase-chip.phase-sunset {
+  background: linear-gradient(135deg, #ffd56b 0%, #ff6b6b 100%);
+  color: #5b1a1a;
+  border-color: rgba(255, 100, 50, 0.4);
+}
+.phase-chip.phase-night {
+  background: linear-gradient(135deg, #2d1b69 0%, #4a3a8c 100%);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.2);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.15),
+    0 0 14px rgba(74, 58, 140, 0.4);
 }
 
-.app-deco .meadow {
-  position: absolute;
-  bottom: -60px;
-  left: -10%;
-  width: 120%;
-  height: 240px;
-  background:
-    radial-gradient(
-      40% 100% at 20% 100%,
-      rgba(168, 216, 185, 0.7) 0%,
-      rgba(168, 216, 185, 0) 70%
-    ),
-    radial-gradient(
-      40% 100% at 80% 100%,
-      rgba(168, 216, 185, 0.55) 0%,
-      rgba(168, 216, 185, 0) 70%
-    );
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .app-deco .cloud { animation: none; }
+@media (max-width: 480px) {
+  .phase-chip-label {
+    display: none;
+  }
+  .phase-chip {
+    padding: 6px 10px;
+  }
 }
 
 /* ---- Header ---- */

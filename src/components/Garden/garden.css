@@ -1207,3 +1207,344 @@
   font-family: var(--font-display);
   font-weight: 600;
 }
+
+/* ============================================================
+   Per-plot ambient particles (PlotParticles component).
+   Each particle floats upward + fades while the plot is growing.
+   ============================================================ */
+.plot-particles {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 1;
+  border-radius: inherit;
+}
+
+.plot-particle {
+  position: absolute;
+  bottom: 20%;
+  left: var(--particle-x, 50%);
+  width: var(--particle-size, 5px);
+  height: var(--particle-size, 5px);
+  border-radius: 50%;
+  background: var(--particle-color, #fff);
+  box-shadow: 0 0 8px var(--particle-glow, var(--particle-color, #fff));
+  opacity: 0;
+  animation: plot-particle-float 2.6s ease-out var(--particle-delay, 0s)
+    infinite;
+  will-change: transform, opacity;
+}
+
+@keyframes plot-particle-float {
+  0% {
+    transform: translate3d(0, 0, 0) scale(1);
+    opacity: 0;
+  }
+  15% {
+    opacity: 0.85;
+  }
+  60% {
+    transform: translate3d(var(--particle-drift-x, 0), -22px, 0) scale(0.95);
+    opacity: 0.6;
+  }
+  100% {
+    transform: translate3d(var(--particle-drift-x, 0), -38px, 0) scale(0.3);
+    opacity: 0;
+  }
+}
+
+/* ---- Variant: grass / leaf-essence (Gräskatt, Bamboukatt) ---- */
+.plot-particle--grass {
+  border-radius: 60% 20% 60% 20%;
+  background: linear-gradient(
+    135deg,
+    var(--particle-color, #7ba67c),
+    var(--particle-body, #c8e6c9)
+  );
+  box-shadow: 0 0 4px var(--particle-glow, #a8d8b9);
+}
+
+/* ---- Variant: spark / sparkle ---- */
+.plot-particle--spark {
+  background: radial-gradient(
+    circle at 35% 35%,
+    #fff 0%,
+    var(--particle-color) 60%
+  );
+  filter: drop-shadow(0 0 5px var(--particle-glow));
+}
+
+/* ---- Variant: blob (Blåbärskatt, Lavendelkatt) ---- */
+.plot-particle--blob {
+  border-radius: 60% 40% 50% 50%;
+  background: radial-gradient(
+    circle at 35% 35%,
+    var(--particle-body, #b3d4fc) 0%,
+    var(--particle-color, #6f87c8) 70%
+  );
+  filter: blur(0.5px);
+}
+
+/* ---- Variant: snow (Isbjörnkatt) ---- */
+.plot-particle--snow {
+  background: white;
+  box-shadow:
+    0 0 6px rgba(255, 255, 255, 0.85),
+    0 0 12px var(--particle-glow);
+  animation-name: plot-particle-snow;
+  animation-duration: 3.2s;
+}
+
+@keyframes plot-particle-snow {
+  0% {
+    transform: translate3d(0, 0, 0) rotate(0);
+    opacity: 0;
+  }
+  20% {
+    opacity: 0.9;
+  }
+  100% {
+    transform: translate3d(var(--particle-drift-x, 0), -42px, 0) rotate(180deg);
+    opacity: 0;
+  }
+}
+
+/* ---- Variant: ember (Vulkankatt, Drakkatt, Phoenixkatt) ---- */
+.plot-particle--ember {
+  background: radial-gradient(
+    circle at 50% 30%,
+    #fff7c2 0%,
+    var(--particle-color, #ff8e3c) 55%,
+    #b54300 100%
+  );
+  box-shadow:
+    0 0 8px var(--particle-color, #ff8e3c),
+    0 0 18px rgba(255, 142, 60, 0.6);
+  animation-name: plot-particle-ember;
+  animation-duration: 2.2s;
+}
+
+@keyframes plot-particle-ember {
+  0% {
+    transform: translate3d(0, 0, 0) scale(1);
+    opacity: 0;
+  }
+  18% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate3d(var(--particle-drift-x, 0), -52px, 0) scale(0.2);
+    opacity: 0;
+  }
+}
+
+/* ---- Variant: diamond (Kristallkatt) ---- */
+.plot-particle--diamond {
+  background: white;
+  border: 1px solid var(--particle-color);
+  box-shadow:
+    0 0 6px var(--particle-glow),
+    inset 0 0 4px rgba(255, 255, 255, 0.9);
+  animation-name: plot-particle-diamond;
+  animation-duration: 3s;
+}
+
+@keyframes plot-particle-diamond {
+  0% {
+    transform: translate3d(0, 0, 0) rotate(45deg) scale(1);
+    opacity: 0;
+  }
+  20%,
+  70% {
+    opacity: 0.95;
+  }
+  100% {
+    transform: translate3d(var(--particle-drift-x, 0), -34px, 0) rotate(225deg)
+      scale(0.4);
+    opacity: 0;
+  }
+}
+
+/* ---- Variant: wisp (Spökkatt) ---- */
+.plot-particle--wisp {
+  background: radial-gradient(
+    circle at center,
+    rgba(255, 255, 255, 0.9) 0%,
+    rgba(255, 255, 255, 0.4) 50%,
+    transparent 100%
+  );
+  filter: blur(2px);
+  animation-duration: 3.8s;
+}
+
+/* ---- Variant: rainbow (Regnbågskatt) ---- */
+.plot-particle--rainbow {
+  background: conic-gradient(
+    from 0deg,
+    #ff6b9d,
+    #ffd56b,
+    #a0e6a0,
+    #6bc9ff,
+    #c8a8ff,
+    #ff6b9d
+  );
+  animation-name: plot-particle-rainbow;
+  animation-duration: 2.5s;
+}
+
+@keyframes plot-particle-rainbow {
+  0% {
+    transform: translate3d(0, 0, 0) rotate(0deg) scale(1);
+    opacity: 0;
+    filter: hue-rotate(0deg);
+  }
+  18% {
+    opacity: 0.95;
+  }
+  100% {
+    transform: translate3d(var(--particle-drift-x, 0), -42px, 0)
+      rotate(360deg) scale(0.4);
+    opacity: 0;
+    filter: hue-rotate(360deg);
+  }
+}
+
+/* ---- Variant: droplet (Tidvattenkatt) ---- */
+.plot-particle--droplet {
+  background: radial-gradient(
+    circle at 35% 30%,
+    #ffffff 0%,
+    var(--particle-color, #85c1e9) 70%
+  );
+  border-radius: 60% 60% 60% 0%;
+  box-shadow: 0 0 6px var(--particle-color, #85c1e9);
+}
+
+/* ---- Variant: star (Stjärnkatt, Enhörningskatt) ---- */
+.plot-particle--star {
+  background: var(--particle-color, #ffe082);
+  clip-path: polygon(
+    50% 0%,
+    61% 35%,
+    98% 35%,
+    68% 57%,
+    79% 91%,
+    50% 70%,
+    21% 91%,
+    32% 57%,
+    2% 35%,
+    39% 35%
+  );
+  box-shadow: 0 0 8px var(--particle-color);
+  border-radius: 0;
+  animation-name: plot-particle-star;
+  animation-duration: 2.4s;
+}
+
+@keyframes plot-particle-star {
+  0% {
+    transform: translate3d(0, 0, 0) rotate(0) scale(0.4);
+    opacity: 0;
+  }
+  25% {
+    opacity: 1;
+    transform: translate3d(0, -10px, 0) rotate(45deg) scale(1.1);
+  }
+  100% {
+    transform: translate3d(var(--particle-drift-x, 0), -40px, 0) rotate(180deg)
+      scale(0.3);
+    opacity: 0;
+  }
+}
+
+/* ---- Variant: cosmic (Rymkatt, Kosmisk Katt) ---- */
+.plot-particle--cosmic {
+  background: radial-gradient(
+    circle at 35% 35%,
+    #ffe6ff 0%,
+    var(--particle-color, #ff00ff) 50%,
+    #5b0d80 100%
+  );
+  box-shadow:
+    0 0 8px var(--particle-color, #ff00ff),
+    0 0 16px var(--particle-glow, #c99df2);
+  animation-name: plot-particle-cosmic;
+  animation-duration: 3s;
+}
+
+@keyframes plot-particle-cosmic {
+  0% {
+    transform: translate3d(0, 0, 0) scale(0.5);
+    opacity: 0;
+  }
+  20% {
+    transform: translate3d(0, -8px, 0) scale(1.1);
+    opacity: 1;
+  }
+  100% {
+    transform: translate3d(var(--particle-drift-x, 0), -48px, 0) scale(0.3);
+    opacity: 0;
+  }
+}
+
+/* ---- Shooting star for Rymkatt / Kosmisk Katt ---- */
+.plot-shooting-star {
+  position: absolute;
+  top: 20%;
+  left: -20%;
+  width: 4px;
+  height: 4px;
+  background: white;
+  border-radius: 50%;
+  box-shadow:
+    0 0 10px white,
+    0 0 20px #c99df2;
+  animation: plot-shooting-star-fly 5.5s ease-out infinite;
+  animation-delay: 2.5s;
+  opacity: 0;
+}
+
+.plot-shooting-star::before {
+  content: '';
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  width: 28px;
+  height: 2px;
+  background: linear-gradient(
+    to left,
+    rgba(255, 255, 255, 0.9),
+    transparent
+  );
+  transform: translateY(-50%) rotate(20deg);
+  transform-origin: right center;
+}
+
+@keyframes plot-shooting-star-fly {
+  0%,
+  85%,
+  100% {
+    opacity: 0;
+    transform: translate3d(0, 0, 0);
+  }
+  5% {
+    opacity: 1;
+  }
+  20% {
+    opacity: 1;
+    transform: translate3d(140%, 28%, 0);
+  }
+  35% {
+    opacity: 0;
+    transform: translate3d(200%, 48%, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .plot-particle,
+  .plot-shooting-star {
+    animation: none;
+    opacity: 0;
+  }
+}

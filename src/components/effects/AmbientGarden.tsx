@@ -6,6 +6,7 @@
 
 import { useMemo } from 'react';
 import { useReducedMotion } from '../../hooks/useReducedMotion';
+import { useParallax } from '../../hooks/useParallax';
 
 interface Drifter {
   id: number;
@@ -65,11 +66,19 @@ function buildDrifters(): Drifter[] {
 export function AmbientGarden() {
   const reduced = useReducedMotion();
   const drifters = useMemo(buildDrifters, []);
+  const parallax = useParallax(20);
 
   if (reduced) return null;
 
   return (
-    <div className="ambient-garden" aria-hidden="true">
+    <div
+      className="ambient-garden"
+      aria-hidden="true"
+      style={{
+        transform: `translate3d(${parallax.x}px, ${parallax.y * 0.6}px, 0)`,
+        willChange: 'transform',
+      }}
+    >
       {drifters.map((d) => {
         if (d.kind === 'sparkle') {
           return (

@@ -25,6 +25,7 @@ import { useGameStore } from '../../store/useGameStore';
 import { useSoundEffects } from '../../hooks/useSoundEffects';
 import { CatSprite } from '../CatDisplay/CatSprite';
 import { PlantSheet } from './PlantSheet';
+import { PlotParticles } from './PlotParticles';
 
 interface PlotCardProps {
   plot: PlotState;
@@ -294,6 +295,7 @@ function GrowingStage({
 
   return (
     <>
+      <PlotParticles catTypeId={catType} />
       <div className="plot-growing-stage fx-cat-target">
         <CatSprite catType={catType} size={96} stage={stage} wiggle />
       </div>

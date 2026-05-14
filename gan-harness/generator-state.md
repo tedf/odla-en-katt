@@ -1,193 +1,170 @@
-# Generator State — Iteration 003 (shop bug fix + 8 cats / 8 boosts / 8 tools)
+# Generator State — Iteration 004 (day/night, parallax, Kattpedia, plot particles)
 
 ## What Was Built This Iteration
 
-### Bug fix — Shop / center panel stacking context
+### Feature 1 — Animated Day/Night Cycle
 
-`src/App.css`:
+New files:
+- `src/hooks/useDayNight.ts` — drives a 10-minute (600s) sky cycle:
+  - Dawn 0–15% (90s), Day 15–55% (240s), Sunset 55–75% (120s),
+    Night 75–100% (150s).
+  - Anchors the cycle to `Date.now() % 600_000` so reloads pick up
+    where they were.
+  - Returns `phase`, `progress` (0..1 within the phase), `cycleProgress`
+    (0..1 across the full cycle), and `cssVars` (`--ambient-tint`,
+    `--surface-warmth`, `--sky-vignette`).
+  - Companion `phaseLabel()` returns `{emoji, label}` in Swedish.
+- `src/components/effects/SkyBackground.tsx` + `sky-background.css` —
+  fixed full-viewport layer at `z-index: -1`:
+  - Four stacked gradient layers (dawn / day / sunset / night) cross-fade
+    via an 8s ease opacity transition.
+  - 48 procedurally generated, deterministic stars with stagger-twinkle
+    keyframes; fade in for sunset/night, out for dawn.
+  - 4 drifting clouds (80s–130s linear) visible during dawn/day.
+  - 80px sun arcing across day phase (sine ease); 60px moon with craters
+    arcing across night.
+  - Vignette layer driven by `--sky-vignette` for a phase-aware bottom
+    glow.
+- `App.tsx`:
+  - Replaced inline `.app-deco` decoration with `<SkyBackground />`.
+  - Applies `cssVars` to `.app-shell` style + `data-phase` attribute
+    for theming hooks.
+  - Renders a `.phase-chip` indicator in the header
+    (🌅 Gryning / ☀️ Dag / 🌇 Solnedgång / 🌙 Natt) with phase-tinted
+    pill backgrounds.
+- `App.css`:
+  - Removed the static `.app-deco` block, replaced with an
+    `.app-shell::after` ambient tint overlay that crossfades over 8s.
+  - Added `.phase-chip` styles (4 phase variants); hides the label on
+    very narrow screens (<=480px).
 
-- `.panel-center` (desktop) now uses `position: relative`,
-  `isolation: isolate`, `z-index: 0`. Establishes a contained stacking
-  context so the upgrade-active banner's conic-gradient glow + any future
-  modal/sheet cannot escape to document root.
-- `.panel-right` mirrors the same `position: relative; z-index: 0`.
-- `.panel-center-content` keeps `overflow-y: auto / overflow-x: hidden`
-  and now has explicit `min-height: 0` so flex children scroll instead of
-  overflowing.
+### Feature 2 — Mouse Parallax
 
-The shop already used `position: absolute` only for the inner
-`.upgrade-active-glow` (clipped by its parent's `overflow: hidden`), so
-the new isolate boundary fully scopes everything to its grid column.
+New file:
+- `src/hooks/useParallax.ts` — returns smoothed normalized pointer
+  position (-1..1) scaled by `strength`. Uses `requestAnimationFrame`
+  with a 0.12 easing factor; throttled state updates only when delta
+  > 0.002. Honors `useReducedMotion()` (returns `{0,0}`) and the
+  `(pointer: fine)` media query (touch returns `{0,0}`).
 
-### Feature 1 — 8 new cats (total 22, including a Mythic tier)
+Wiring:
+- `SkyBackground.tsx`: stars use `useParallax(8)`, clouds use
+  `useParallax(15)`. Applied via `translate3d`.
+- `AmbientGarden.tsx`: butterflies/leaves use `useParallax(20)`
+  (y-axis dampened to 0.6 of the strength) on the layer root.
+- `Garden.tsx`: the `.garden-grid` itself uses `useParallax(3)` for
+  subtle foreground depth.
 
-`src/domain/catTypes.ts`:
+### Feature 3 — Kattpedia (replaces "Stall")
 
-- Added `lavendercat`, `honeycat` (uncommon), `crystalcat`, `ghostcat`
-  (rare), `phoenixcat`, `tidekatt` (epic), `thundercat` (legendary), and
-  `cosmiccat` (mythic). Mythic tier was already in the rarity union;
-  Rymkatt and Kosmisk Katt both share it now.
-- `CAT_TYPE_ORDER` rewritten so the shop list flows by progression /
-  unlock threshold (1700, 2000, 2200, 2800, 3200, 3400, 3500, 6000, 7500,
-  8200, 9000, 18000, 25000, 35000, 100000).
-- Unlock thresholds chosen so the new cats slot between existing tiers
-  without disrupting the original tuning curve.
+New files:
+- `src/components/Kattpedia/Kattpedia.tsx` + `kattpedia.css` —
+  collection screen with two views:
+  - **Grid**: `repeat(auto-fill, minmax(160–170px, 1fr))` of cards.
+    Each card shows: 80px CatSprite (glowing for non-common cats),
+    Swedish name (or "??? Okänd katt" silhouette if not yet
+    harvested), a per-rarity badge, and a "×N" total-grown badge.
+  - **Detail**: opens via `motion.div layoutId` spring transition,
+    fills the panel, shows: 160px CatSprite with halo + radial glow,
+    rarity badge in oversized type, flavor description, Swedish lore
+    paragraph in a left-bordered quote, three stat blocks (growth
+    time, sell value, seed cost), and a "Din historia med X" panel
+    with 6 personal stats (count grown, total earned, best weather
+    bonus, top-rolled trait, last-named cat, seed inventory).
+  - Mythic detail view triggers a 14-mote particle burst expanding
+    out from the centre.
+  - Back button uses inverse `layoutId` animation.
+- Rarity shimmer (CSS):
+  - **common** — no shimmer
+  - **uncommon** — soft silver linear shimmer sweep, 5s
+  - **rare** — blue/purple linear shimmer sweep, 4.2s
+  - **epic** — gold conic-gradient border with rotating ray shimmer,
+    9s
+  - **legendary** — rainbow conic-gradient border with pulse +
+    sweep shimmer
+  - **mythic** — magenta/cyan conic border with blur-glow halo +
+    overlay shimmer; the detail view additionally fires a 14-mote
+    burst on open
+- `App.tsx`: the "stall" panel slot now renders `<Kattpedia />` in
+  place of the old `<CatDisplay />`. (CatDisplay file is kept but
+  unused.)
+- `src/domain/catTypes.ts`: added a `lore: string` field to the
+  `CatType` interface and wrote a short, kid-friendly Swedish lore
+  blurb for all 22 cat types.
 
-`src/components/CatDisplay/CatSprite.tsx`:
+### Feature 4 — Per-Plot Ambient Particles
 
-- New SVG badges for every new cat, drawn from primitives:
-  - **Lavendelkatt** — 5-flower crown with stems and a soft scent glow.
-  - **Honingskatt** — three honeycomb hex cells on the belly + a bumbling
-    bee above the head with striped body and wings.
-  - **Kristallkatt** — three pointed crystal shards on the head + a
-    faceted belly diamond with refraction highlights.
-  - **Spökkatt** — translucent veil overlay, dot eyes, double wiggly
-    ghost tail along the lower body, ambient aura ring.
-  - **Fenixkatt** — flame wings on both sides, burning crest on top,
-    ember dots flanking the tail.
-  - **Tidvattenkatt** — wave curl band across the back + falling water
-    droplets with highlight.
-  - **Åskkatt** — three-cloud storm crown, large yellow lightning bolt
-    centered between the ears, body crackle lines.
-  - **Kosmisk Katt** — spiral galaxy on the belly with a rotating CSS
-    animation, plus 8 floating cosmic particles drifting in CSS-driven
-    staggered delays.
-
-`src/components/CatDisplay/cat-sprite.css`:
-
-- New `cosmic-spin` (galaxy rotation, 18 s) and `cosmic-drift`
-  (particles, 4.5-7 s with per-particle delays) keyframes.
-- `prefers-reduced-motion` override disables both.
-
-`src/components/Shop/shop.css`:
-
-- `seed-card.rarity-mythic` now uses an animated bordered card
-  (`mythic-border` keyframe, 6 s) plus an intense magenta glow with
-  shadow + inset rim.
-
-### Feature 2 — 8 boost tiers (was 4)
-
-`src/domain/upgrades.ts`:
-
-- `SPEED_UPGRADES` expanded to 8 tiers: 1.5x / 2x / 3x / 5x / 8x / 12x /
-  20x / 50x. Costs scale 50 → 1,000,000; durations 30 min → 24 h.
-  Emojis cover potion → tornado → portal → cosmos → explosion → stop.
-- New `SpeedUpgradeId` union now includes `speed_5..8`.
-- New pure helper `classifySpeedUpgrades(coins)` returns each upgrade
-  tagged as `affordable`, `next`, or `locked`. The shop uses this to
-  show all affordable boosts plus the next aspirational one, and renders
-  far-away boosts as locked previews.
-
-`src/components/Shop/Shop.tsx`:
-
-- `UpgradesTab` iterates `classifySpeedUpgrades(coins)`; far-out tiers
-  become a `LockedUpgradePreview` row with a lock badge and hint copy;
-  the next-affordable boost gets a "Nästa mål" pill.
-- `UpgradeCard` accepts the new `status` prop and applies a
-  `next-goal` class (subtle gold-tint background, gold "Nästa mål"
-  pill) when the boost is the next aspirational tier.
-
-### Feature 3 — 8 utility tools (was 1)
-
-`src/domain/upgrades.ts`:
-
-- `UTILITY_UPGRADES` expanded from 1 to 8 entries. Each now carries an
-  `unlockThreshold: number` (lifetime-earned coins required before the
-  tool is revealed in the shop).
-- New derived helpers:
-  - `seedInventoryCap(owned)` — 5 base, 10 with `extra_seed_slot`
-  - `weatherProbabilityMultipliers(owned)` — 2x for all events with
-    `lightning_rod`; 3x for meteor + tornado with `cosmic_antenna`
-    (multiplicative)
-  - `sellValueMultiplier(owned)` — 1.10 with `golden_watering_can`
-  - `offlineTimeMultiplier(owned)` — 2 with `time_capsule`
-  - `luckyMagicalBias(owned)` — 0.15 with `lucky_soil`
-  - `hasCatWhisperer(owned)` — true with `cat_whisperer`
-
-`src/store/useGameStore.ts` (wiring):
-
-- `tick()` now passes `weatherProbabilityMultipliers(state.utilityUpgrades)`
-  into `rollAnyWeatherEvent`.
-- `harvestCat()` reads the owner's utilities and:
-  - rolls personality with `luckyMagicalBias` and optional
-    `rollExtraTrait` (cat_whisperer)
-  - stacks the extra trait's `traitValueMultiplier` multiplicatively
-  - applies `sellValueMultiplier` for `golden_watering_can` on every
-    sale.
-- `buySeed()` honors `seedInventoryCap`. Trying to buy past the cap
-  yields a toast ("Fröpåsen är full") instead of silently subtracting
-  coins.
-- `bootstrapInitialState()` multiplies the offline-time speed by
-  `offlineTimeMultiplier(save.utilityUpgrades)` before feeding it into
-  `calculateOfflineProgress`.
-
-`src/domain/events.ts`:
-
-- `rollAnyWeatherEvent` accepts an optional 4th `probabilityMultipliers`
-  argument. Adjusted probability is capped at 1.0 per event.
-
-`src/domain/catPersonality.ts`:
-
-- `rollPersonality` now accepts a 2nd `options` argument
-  (`{luckyMagicalBias, rollExtraTrait}`). When bias > 0 and the roll
-  fires, the trait is forced to `lucky` or `magical` (50/50). When
-  `rollExtraTrait` is true, an `extraTraitId` is included in the result.
-
-`src/components/Shop/Shop.tsx`:
-
-- `UtilityTab` classifies every tool as `owned` (green ✓), `affordable`
-  (active purple buy button), `locked-cost` (locked icon + cost, shake
-  on click), or `mystery` (shown as "???" with hashed background until
-  the threshold is reached). A "Nästa verktyg låses upp vid X mynt
-  intjänat" hint appears below the list whenever there is a hidden tool.
-
-### Tests
-
-`src/domain/__tests__/upgrades.test.ts`:
-
-- Updated `SPEED_UPGRADES` length assertion to 8.
-- Added per-tier spec checks for tiers 5 and 8.
-- New `describe('classifySpeedUpgrades')` block with three cases:
-  wealthy player (all affordable), partial wealth (1 affordable, 1
-  next, rest locked), broke (tier 1 marked as next).
-
-All 92 tests pass; previous tests untouched.
+New file:
+- `src/components/Garden/PlotParticles.tsx` — renders 6–8 absolutely
+  positioned particle spans inside the plot card while the plot is in
+  the `growing` state. Each particle reads `--particle-color`,
+  `--particle-glow`, `--particle-body`, `--particle-delay`,
+  `--particle-x`, `--particle-size`, `--particle-drift-x` from the
+  cat's palette. Selects a CSS variant per cat species:
+  - `grass` (Gräskatt, Bamboukatt) — leaf shape, accent gradient
+  - `spark` (Morotskatt, Citruskatt, Honeycat, Kokosnötkatt,
+    Thundercat) — radial sparkle with glow
+  - `blob` (Blåbärskatt, Lavendelkatt) — soft blurred berry-blobs
+  - `snow` (Isbjörnkatt) — slow falling rotating dots, 3.2s
+  - `ember` (Vulkankatt, Drakkatt, Phoenixkatt) — orange-red embers
+    with shadow glow, lifted 52px with horizontal drift
+  - `diamond` (Kristallkatt) — rotating diamond outlines with
+    inner-shine
+  - `wisp` (Spökkatt) — translucent blurred wisps, 3.8s
+  - `rainbow` (Regnbågskatt) — conic-gradient + hue-rotate animation
+    cycles through full spectrum, 2.5s
+  - `droplet` (Tidvattenkatt) — teardrop with shadow
+  - `star` (Stjärnkatt, Enhörningskatt) — clip-path star polygon
+    with rotation
+  - `cosmic` (Rymkatt, Kosmisk Katt) — magenta cosmic dust with
+    inner halo
+- For `rymkatt` and `cosmiccat` an additional `.plot-shooting-star`
+  fires diagonally across the plot every ~5.5s.
+- Wired into `PlotCard.tsx` inside `GrowingStage` so particles only
+  appear while plot.state is `growing`.
+- All keyframes added to `garden.css`; `prefers-reduced-motion`
+  disables them.
 
 ## What Changed This Iteration
 
-- Cat count: 14 → 22 (8 new across uncommon/rare/epic/legendary/mythic).
-- Speed boosts: 4 → 8 tiers.
-- Utility tools: 1 → 8.
-- Shop's Upgrades tab now uses a "show next aspirational + lock distant"
-  display strategy.
-- Shop's Verktyg tab now uses unlock thresholds with mystery (???) rows
-  for unreached tools.
-- The shop / center panel is now wrapped in its own stacking context so
-  nothing inside can escape to the document root.
-
-## Known Issues / Limitations
-
-- The `cat_whisperer` extra trait only affects sell value (multiplied
-  in via `traitValueMultiplier`). Growth-time traits from the second
-  roll are not applied because the cat is already fully grown by the
-  time we roll a personality. This matches the spec's framing of
-  personality as a post-harvest trait.
-- Mythic gradient border uses `-webkit-mask` / `mask-composite`.
-  Verified to render on Chrome / Safari / Firefox in the production
-  build.
-- Cosmic-cat galaxy animation uses a transform-translate keyframe so it
-  composites correctly even though it lives inside an SVG `<g>` whose
-  parent already has a translate. The keyframe re-applies the
-  translation explicitly.
+- Sky is now a living, looping day/night cycle rather than a single
+  static deco.
+- Headers have a Swedish phase indicator chip with phase-tinted
+  backgrounds.
+- Background layers parallax with the mouse on fine-pointer devices.
+- The Stall tab is now a Pokédex-style Kattpedia with shimmer rarity
+  effects and dramatic Framer Motion layout transitions.
+- Every growing plot now emits species-specific particles, and the
+  Rymkatt / Kosmisk Katt plots have a shooting star.
+- New `lore` field on every cat type drives the Kattpedia detail
+  copy.
 
 ## Tests
 
-- `npm test` — 92 passing across 6 files.
-- `npm run build` — passes. Bundle: 454 kB JS (137 kB gzipped),
-  86 kB CSS (16 kB gzipped).
+- `npm test` — 92 passing across 6 files (no test regressions).
+- `npm run build` — clean. Bundle: 471 kB JS (143 kB gzipped),
+  102 kB CSS (19 kB gzipped).
+
+## Known Issues / Notes
+
+- The old `CatDisplay` component still exists in
+  `src/components/CatDisplay/`. The Kattpedia replaces it from
+  `App.tsx`, but CatDisplay is unused — kept around in case the
+  Evaluator wants to compare or in case some legacy reference needs
+  it.
+- Stars/clouds in `SkyBackground` use a seeded RNG with a fixed seed
+  for deterministic layout. If two reviewers see the same page the
+  star pattern matches.
+- The day/night phase indicator updates on a 1s setInterval; the
+  CSS transitions smooth the visual change. The full cycle is 10
+  minutes — Evaluators briefly visiting the page will likely see one
+  to two phase boundaries.
+- The mouse parallax intentionally returns `{0,0}` on touch devices
+  and respects the in-app `reducedMotion` toggle as well as the OS
+  `prefers-reduced-motion` setting.
 
 ## Dev Server
 
 - URL: `http://localhost:5173`
-- Status: running (verified `HTTP 200` on `/`).
+- Status: running (HTTP 200 on /).
 - Command: `npm run dev`.

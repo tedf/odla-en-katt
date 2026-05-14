@@ -1,0 +1,195 @@
+/* SkyBackground — full-viewport living sky behind the app shell. */
+
+.sky-bg {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.sky-layer {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 8s ease;
+}
+
+.sky-layer.is-active {
+  opacity: 1;
+}
+
+/* ---- Sun ---- */
+.sky-sun {
+  position: absolute;
+  width: 80px;
+  height: 80px;
+  margin-left: -40px;
+  margin-top: -40px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at 35% 35%,
+    #fff8d6 0%,
+    #ffd56b 30%,
+    #f59f1d 65%,
+    rgba(245, 159, 29, 0) 100%
+  );
+  box-shadow:
+    0 0 60px rgba(255, 213, 107, 0.55),
+    0 0 120px rgba(255, 159, 29, 0.35);
+  transition:
+    left 8s ease,
+    top 8s ease,
+    opacity 4s ease;
+  pointer-events: none;
+}
+
+/* ---- Moon ---- */
+.sky-moon {
+  position: absolute;
+  width: 60px;
+  height: 60px;
+  margin-left: -30px;
+  margin-top: -30px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at 35% 35%,
+    #fffef8 0%,
+    #f0eef0 60%,
+    #c3c0d8 100%
+  );
+  box-shadow:
+    0 0 30px rgba(255, 255, 255, 0.5),
+    0 0 70px rgba(167, 139, 250, 0.35);
+  transition:
+    left 8s ease,
+    top 8s ease,
+    opacity 4s ease;
+  pointer-events: none;
+}
+
+.sky-moon-crater {
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(120, 110, 140, 0.22);
+}
+
+.sky-moon-crater--a {
+  width: 10px;
+  height: 10px;
+  top: 18%;
+  left: 28%;
+}
+.sky-moon-crater--b {
+  width: 7px;
+  height: 7px;
+  top: 55%;
+  left: 56%;
+}
+.sky-moon-crater--c {
+  width: 5px;
+  height: 5px;
+  top: 38%;
+  left: 68%;
+}
+
+/* ---- Stars ---- */
+.sky-stars {
+  position: absolute;
+  inset: 0;
+  transition: opacity 6s ease;
+  will-change: transform, opacity;
+}
+
+.sky-star {
+  position: absolute;
+  border-radius: 50%;
+  background: white;
+  box-shadow: 0 0 6px rgba(255, 255, 255, 0.65);
+  animation-name: sky-star-twinkle;
+  animation-iteration-count: infinite;
+  animation-timing-function: ease-in-out;
+}
+
+@keyframes sky-star-twinkle {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: scale(0.85);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.1);
+  }
+}
+
+/* ---- Clouds ---- */
+.sky-clouds {
+  position: absolute;
+  inset: 0;
+  transition: opacity 6s ease;
+  will-change: transform, opacity;
+}
+
+.sky-cloud {
+  position: absolute;
+  left: -300px;
+  border-radius: 50%;
+  background: radial-gradient(
+    ellipse at center,
+    rgba(255, 255, 255, 0.95) 0%,
+    rgba(255, 255, 255, 0.7) 45%,
+    rgba(255, 255, 255, 0) 75%
+  );
+  filter: blur(1px);
+  animation-name: sky-cloud-drift;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+
+@keyframes sky-cloud-drift {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(calc(100vw + 400px));
+  }
+}
+
+/* ---- Bottom vignette — picks up phase tint for grounding ---- */
+.sky-vignette {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(
+      120% 60% at 50% 100%,
+      var(--sky-vignette, rgba(255, 255, 255, 0)) 0%,
+      transparent 70%
+    ),
+    radial-gradient(
+      120% 50% at 50% 0%,
+      transparent 60%,
+      var(--ambient-tint, transparent) 100%
+    );
+  transition: background 6s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sky-star,
+  .sky-cloud {
+    animation: none;
+  }
+  .sky-cloud {
+    transform: translateX(40vw);
+  }
+}
+
+.sky-bg.is-reduced-motion .sky-star,
+.sky-bg.is-reduced-motion .sky-cloud {
+  animation: none;
+}
+
+.sky-bg.is-reduced-motion .sky-cloud {
+  transform: translateX(40vw);
+}

@@ -6,6 +6,7 @@
 import { useEffect, useState } from 'react';
 import { useGameStore } from '../../store/useGameStore';
 import { useSoundEffects } from '../../hooks/useSoundEffects';
+import { useParallax } from '../../hooks/useParallax';
 import { activeMultiplier } from '../../domain/upgrades';
 import { nextPlotUnlock } from '../../domain/economy';
 import { formatCoins } from '../../domain/time';
@@ -27,6 +28,7 @@ export function Garden() {
   const readyCount = plots.filter((p) => p.state === 'ready').length;
   const { playHarvest } = useSoundEffects();
   const upcoming = nextPlotUnlock(totalEarned);
+  const gridParallax = useParallax(3);
 
   return (
     <section className="section-card garden-section" aria-label="Trädgården">
@@ -53,7 +55,12 @@ export function Garden() {
           </button>
         )}
       </header>
-      <div className="garden-grid">
+      <div
+        className="garden-grid"
+        style={{
+          transform: `translate3d(${gridParallax.x}px, ${gridParallax.y}px, 0)`,
+        }}
+      >
         {plots.map((plot) => (
           <PlotCard key={plot.index} plot={plot} />
         ))}
