@@ -9,7 +9,7 @@
  */
 
 import type { CatTypeId } from './catTypes';
-import { CAT_TYPE_ORDER } from './catTypes';
+import { CAT_TYPE_ORDER, CAT_TYPES } from './catTypes';
 import type { PlotState } from './plots';
 import { createDefaultPlots, MAX_PLOTS } from './plots';
 import type {
@@ -226,6 +226,25 @@ function padPlots(plots: Partial<PlotState>[]): PlotState[] {
     });
   }
   return result.slice(0, MAX_PLOTS).map((p, i) => ({ ...p, index: i }));
+}
+
+// Re-evaluate which cat types should be unlocked based on current earnings.
+// Merges saved unlocks with any cats that should now be unlocked but weren't
+// in the save (e.g. cats added after the save was created, or missed unlocks).
+function recomputeUnlockedCatTypes(
+  saved: CatTypeId[],
+  totalEarned: number,
+  catsSold: Record<string, number>,
+): CatTypeId[] {
+  const result = new Set<CatTypeId>(saved);
+  for (const id of CAT_TYPE_ORDER) {
+    const cat = CAT_TYPES[id];
+    if (!cat) continue;
+    const earnedOk = cat.unlock.totalEarned === null || totalEarned >= cat.unlock.totalEarned;
+    const soldOk = cat.unlock.graskattsSold === null || (catsSold['graskatt'] ?? 0) >= cat.unlock.graskattsSold;
+    if (earnedOk && soldOk) result.add(id);
+  }
+  return Array.from(result);
 }
 
 function mergeRecord(
@@ -449,11 +468,16 @@ function migrate(raw: unknown, now: number): SaveData {
       typeof r.totalEarned === 'number' ? r.totalEarned : base.totalEarned,
     plots,
     seedInventory: mergeRecord(r.seedInventory, base.seedInventory),
-    unlockedCatTypes:
+    unlockedCatTypes: recomputeUnlockedCatTypes(
       Array.isArray(r.unlockedCatTypes) &&
       r.unlockedCatTypes.every((s) => typeof s === 'string')
         ? (r.unlockedCatTypes as CatTypeId[])
         : base.unlockedCatTypes,
+      typeof r.totalEarned === 'number' ? r.totalEarned : 0,
+      typeof r.catsSoldByType === 'object' && r.catsSoldByType !== null
+        ? (r.catsSoldByType as Record<string, number>)
+        : {},
+    ),
     catsSoldByType: mergeRecord(r.catsSoldByType, base.catsSoldByType),
     lastStormAt:
       typeof r.lastStormAt === 'number' || r.lastStormAt === null

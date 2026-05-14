@@ -188,6 +188,10 @@
     flex-direction: column;
     overflow-y: auto;
     overflow-x: hidden;
+    /* z-index: 1 ensures PlantSheet (fixed, z-index: 1000) stacks above
+       panel-center (isolation: isolate, z-index: 0) */
+    position: relative;
+    z-index: 1;
   }
   .panel-main > .garden-section { flex: 1; min-height: 0; }
   .panel-right {
